@@ -9,33 +9,33 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0C0C16;
-    --sidebar: #0C0C16;
-    --bg-elev: #17172699;
-    --bg-elev-2: #1E1E30;
-    --gold: #FFC857;
-    --gold-dim: #E0A93E;
-    --rose: #FF6B6B;
-    --teal: #4ECDC4;
-    --violet: #A78BFA;
-    --cream: #F6F4FB;
-    --cream-dim: #8E8BA6;
-    --line: rgba(246,244,251,0.06);
-    --c-ai: #A78BFA;
-    --c-movie: #FF6B6B;
-    --c-series: #4ECDC4;
-    --c-show: #FFC857;
+    --bg: #0A0E27;
+    --sidebar: #0A0E27;
+    --bg-elev: #12163899;
+    --bg-elev-2: #1B2050;
+    --gold: #6C5DD3;
+    --gold-dim: #4B3F92;
+    --rose: #8B7FE0;
+    --teal: #4B3F92;
+    --violet: #6C5DD3;
+    --cream: #F2F0FA;
+    --cream-dim: #9C9AC0;
+    --line: rgba(242,240,250,0.08);
+    --c-ai: #8B7FE0;
+    --c-movie: #6C5DD3;
+    --c-series: #4B3F92;
+    --c-show: #A99BE8;
   }
   :root:not([data-theme="light"]) { color-scheme: dark; }
   @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
-      --bg: #FAF9F5; --sidebar: #FAF9F5; --bg-elev: #FFFFFF; --bg-elev-2: #F0EEFB;
-      --cream: #17172A; --cream-dim: #6E6C86; --line: rgba(23,23,42,0.08);
+      --bg: #F4F3FB; --sidebar: #F4F3FB; --bg-elev: #FFFFFF; --bg-elev-2: #E8E5F8;
+      --cream: #0A0E27; --cream-dim: #5B5880; --line: rgba(10,14,39,0.08);
     }
   }
   :root[data-theme="light"] {
-    --bg: #FAF9F5; --sidebar: #FAF9F5; --bg-elev: #FFFFFF; --bg-elev-2: #F0EEFB;
-    --cream: #17172A; --cream-dim: #6E6C86; --line: rgba(23,23,42,0.08);
+    --bg: #F4F3FB; --sidebar: #F4F3FB; --bg-elev: #FFFFFF; --bg-elev-2: #E8E5F8;
+    --cream: #0A0E27; --cream-dim: #5B5880; --line: rgba(10,14,39,0.08);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -56,10 +56,9 @@
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
   }
   .sidebar-brand {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.55rem;
     padding: 4px 12px 28px; letter-spacing: 0.01em;
   }
-  .sidebar-brand span { color: var(--rose); }
   .brand-mark { display: inline-flex; align-items: center; gap: 4px; }
   .brand-next { color: var(--cream); }
   .brand-kino { color: var(--violet); }
@@ -146,27 +145,27 @@
     display: flex; align-items: center; justify-content: center; padding: 24px;
   }
   .entry-inner { max-width: 420px; width: 100%; text-align: center; }
-  .entry-brand { font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.2rem; color: var(--cream); margin-bottom: 10px; }
-  .entry-brand span { color: var(--rose); }
+  .entry-brand { font-family: 'Fraunces', serif; font-weight: 700; font-size: 3.2rem; color: #F2F0FA; margin-bottom: 14px; }
+  .entry-inner .brand-next { color: #F2F0FA; }
   .entry-tagline { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.4rem; color: var(--rose); margin: 0 0 10px; }
-  .entry-sub { color: var(--cream-dim); font-size: 0.92rem; margin: 0 0 32px; line-height: 1.6; }
+  .entry-sub { color: #B8B5D8; font-size: 0.92rem; margin: 0 0 32px; line-height: 1.6; }
   .entry-choice { display: flex; gap: 14px; justify-content: center; }
   .entry-btn { padding: 13px 30px; border-radius: 999px; border: none; font-weight: 700; font-size: 0.95rem; color: #fff; }
   .entry-btn-login { background: linear-gradient(135deg, var(--violet), var(--rose)); }
   .entry-btn-signup { background: linear-gradient(135deg, var(--rose), var(--violet)); }
   .entry-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
-  .entry-field label { display: block; font-size: 0.8rem; color: var(--cream-dim); margin-bottom: 6px; }
+  .entry-field label { display: block; font-size: 0.8rem; color: #B8B5D8; margin-bottom: 6px; }
   .entry-field input {
-    width: 100%; padding: 12px 14px; background: var(--bg-elev-2); border: 1px solid var(--line);
-    border-radius: 10px; color: var(--cream); font-size: 0.95rem; outline: none; box-sizing: border-box;
+    width: 100%; padding: 12px 14px; background: #1B2050; border: 1px solid rgba(242,240,250,0.14);
+    border-radius: 10px; color: #F2F0FA; font-size: 0.95rem; outline: none; box-sizing: border-box;
   }
   .entry-field input:focus { border-color: var(--rose); }
-  .entry-error { color: var(--rose); font-size: 0.82rem; min-height: 1em; }
+  .entry-error { color: #FF8A8A; font-size: 0.82rem; min-height: 1em; }
   .entry-submit {
     background: linear-gradient(135deg, var(--violet), var(--rose)); color: #fff; border: none;
     padding: 13px; border-radius: 999px; font-weight: 700; font-size: 0.95rem;
   }
-  .entry-back { background: none; border: none; color: var(--cream-dim); font-size: 0.82rem; padding: 4px; }
+  .entry-back { background: none; border: none; color: #B8B5D8; font-size: 0.82rem; padding: 4px; }
   .avatar-wrap { position: relative; }
   .profile-menu {
     position: absolute; top: calc(100% + 14px); right: 0; width: 280px;
@@ -327,7 +326,7 @@
 
 <div class="entry-overlay" id="entryOverlay">
   <div class="entry-inner">
-    <div class="entry-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
+    <div class="entry-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <p class="entry-tagline">Your Story Begins Here</p>
     <p class="entry-sub">Сэтгэл хөдөлгөх кино, цуврал контентуудыг нэг дороос үзээрэй.</p>
 
@@ -354,7 +353,7 @@
 
 <div class="app">
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
+    <div class="sidebar-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <div class="nav-group" id="mainNav"></div>
     <div class="nav-divider"></div>
     <div class="nav-group">
