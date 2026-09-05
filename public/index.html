@@ -134,6 +134,35 @@
   .bank-info strong { color: var(--gold); }
   .bank-confirm-btn { width: 100%; background: var(--gold); color: #1A130A; border: none; padding: 11px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; }
   .bank-confirm-btn:disabled { opacity: 0.6; }
+
+  /* ---------- Entry / landing overlay ---------- */
+  .entry-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: radial-gradient(ellipse at 30% 20%, #2A1830 0%, #0C0C16 55%), #0C0C16;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .entry-inner { max-width: 420px; width: 100%; text-align: center; }
+  .entry-brand { font-family: 'Fraunces', serif; font-weight: 700; font-size: 2.2rem; color: var(--cream); margin-bottom: 10px; }
+  .entry-brand span { color: var(--rose); }
+  .entry-tagline { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.4rem; color: var(--rose); margin: 0 0 10px; }
+  .entry-sub { color: var(--cream-dim); font-size: 0.92rem; margin: 0 0 32px; line-height: 1.6; }
+  .entry-choice { display: flex; gap: 14px; justify-content: center; }
+  .entry-btn { padding: 13px 30px; border-radius: 999px; border: none; font-weight: 700; font-size: 0.95rem; color: #fff; }
+  .entry-btn-login { background: linear-gradient(135deg, var(--violet), var(--rose)); }
+  .entry-btn-signup { background: linear-gradient(135deg, var(--rose), var(--violet)); }
+  .entry-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+  .entry-field label { display: block; font-size: 0.8rem; color: var(--cream-dim); margin-bottom: 6px; }
+  .entry-field input {
+    width: 100%; padding: 12px 14px; background: var(--bg-elev-2); border: 1px solid var(--line);
+    border-radius: 10px; color: var(--cream); font-size: 0.95rem; outline: none; box-sizing: border-box;
+  }
+  .entry-field input:focus { border-color: var(--rose); }
+  .entry-error { color: var(--rose); font-size: 0.82rem; min-height: 1em; }
+  .entry-submit {
+    background: linear-gradient(135deg, var(--violet), var(--rose)); color: #fff; border: none;
+    padding: 13px; border-radius: 999px; font-weight: 700; font-size: 0.95rem;
+  }
+  .entry-back { background: none; border: none; color: var(--cream-dim); font-size: 0.82rem; padding: 4px; }
   .avatar-wrap { position: relative; }
   .profile-menu {
     position: absolute; top: calc(100% + 14px); right: 0; width: 280px;
@@ -292,6 +321,33 @@
 </head>
 <body>
 
+<div class="entry-overlay" id="entryOverlay">
+  <div class="entry-inner">
+    <div class="entry-brand">ТӨСӨӨ<span>ЛӨЛ</span></div>
+    <p class="entry-tagline">Your Story Begins Here</p>
+    <p class="entry-sub">Сэтгэл хөдөлгөх кино, цуврал контентуудыг нэг дороос үзээрэй.</p>
+
+    <div class="entry-choice" id="entryChoice">
+      <button class="entry-btn entry-btn-login" id="entryLoginBtn">Нэвтрэх</button>
+      <button class="entry-btn entry-btn-signup" id="entrySignupBtn">Бүртгүүлэх</button>
+    </div>
+
+    <form class="entry-form" id="entryForm" style="display:none;">
+      <div class="entry-field" id="entryNameField" style="display:none;">
+        <label>Нэр</label>
+        <input type="text" id="entryNameInput" placeholder="Нэрээ оруулна уу">
+      </div>
+      <div class="entry-field">
+        <label>Утасны дугаар</label>
+        <input type="tel" id="entryPhoneInput" placeholder="9911XXXX" inputmode="numeric">
+      </div>
+      <div class="entry-error" id="entryError"></div>
+      <button type="submit" class="entry-submit" id="entrySubmitBtn">Нэвтрэх</button>
+      <button type="button" class="entry-back" id="entryBackBtn">← Буцах</button>
+    </form>
+  </div>
+</div>
+
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">ТӨСӨӨ<span>ЛӨЛ</span></div>
@@ -339,7 +395,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>
               <span><strong>Бичлэг оруулах</strong>Та бичлэгээ оруулаарай.</span>
             </button>
-            <button class="profile-item">
+            <button class="profile-item" id="logoutBtn">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
               <span><strong>Гарах</strong>Системээс гарах.</span>
             </button>
@@ -662,6 +718,7 @@
   function smallIcon(p){ return p ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg>'; }
 
   function openPlayer(id){
+    if (!USER_ID) { showEntryOverlay(); return; }
     if (!subscriptionActive) { openSubModal(); return; }
     curVideo = allVideos().find(v => v.id === id);
     document.getElementById('modalTitle').textContent = curVideo.title;
@@ -716,16 +773,80 @@
     document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
   });
 
-  // ---------- Subscription ----------
-  function getUserId(){
-    let id = localStorage.getItem('tosoolol_user_id');
-    if (!id) {
-      id = (crypto.randomUUID ? crypto.randomUUID() : 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-      localStorage.setItem('tosoolol_user_id', id);
-    }
-    return id;
+  // ---------- Auth (phone-based, no SMS) ----------
+  const entryOverlay = document.getElementById('entryOverlay');
+  const entryChoice = document.getElementById('entryChoice');
+  const entryForm = document.getElementById('entryForm');
+  const entryNameField = document.getElementById('entryNameField');
+  const entryNameInput = document.getElementById('entryNameInput');
+  const entryPhoneInput = document.getElementById('entryPhoneInput');
+  const entryError = document.getElementById('entryError');
+  const entrySubmitBtn = document.getElementById('entrySubmitBtn');
+  let entryMode = 'login';
+
+  function getStoredUser(){
+    const phone = localStorage.getItem('tosoolol_phone');
+    const name = localStorage.getItem('tosoolol_name');
+    return phone ? { phone, name } : null;
   }
-  const USER_ID = getUserId();
+  function hideEntryOverlay(){ entryOverlay.style.display = 'none'; }
+  function showEntryOverlay(){
+    entryOverlay.style.display = 'flex';
+    entryChoice.style.display = 'flex';
+    entryForm.style.display = 'none';
+  }
+  function openEntryForm(mode){
+    entryMode = mode;
+    entryChoice.style.display = 'none';
+    entryForm.style.display = 'flex';
+    entryNameField.style.display = mode === 'signup' ? 'block' : 'none';
+    entrySubmitBtn.textContent = mode === 'signup' ? 'Бүртгүүлэх' : 'Нэвтрэх';
+    entryError.textContent = '';
+  }
+  document.getElementById('entryLoginBtn').addEventListener('click', () => openEntryForm('login'));
+  document.getElementById('entrySignupBtn').addEventListener('click', () => openEntryForm('signup'));
+  document.getElementById('entryBackBtn').addEventListener('click', () => {
+    entryChoice.style.display = 'flex';
+    entryForm.style.display = 'none';
+  });
+  entryForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    entryError.textContent = '';
+    const phone = entryPhoneInput.value.trim();
+    const name = entryNameInput.value.trim();
+    if (!phone) { entryError.textContent = 'Утасны дугаараа оруулна уу.'; return; }
+    if (entryMode === 'signup' && !name) { entryError.textContent = 'Нэрээ оруулна уу.'; return; }
+    entrySubmitBtn.disabled = true;
+    try {
+      const url = entryMode === 'signup' ? '/api/auth/register' : '/api/auth/login';
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, name })
+      });
+      const data = await res.json();
+      if (!res.ok) { entryError.textContent = data.error || 'Алдаа гарлаа.'; entrySubmitBtn.disabled = false; return; }
+      localStorage.setItem('tosoolol_phone', data.phone);
+      localStorage.setItem('tosoolol_name', data.name);
+      USER_ID = data.phone;
+      hideEntryOverlay();
+      checkSubscription();
+    } catch (err) {
+      entryError.textContent = 'Сүлжээний алдаа гарлаа.';
+    }
+    entrySubmitBtn.disabled = false;
+  });
+
+  const storedUser = getStoredUser();
+  if (storedUser) hideEntryOverlay(); else showEntryOverlay();
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('tosoolol_phone');
+    localStorage.removeItem('tosoolol_name');
+    location.reload();
+  });
+
+  // ---------- Subscription ----------
+  let USER_ID = storedUser ? storedUser.phone : null;
   let subscriptionActive = false;
   const subBtn = document.getElementById('subBtn');
   const subModalBackdrop = document.getElementById('subModalBackdrop');
@@ -789,6 +910,7 @@
   }
 
   async function checkSubscription(){
+    if (!USER_ID) { subscriptionActive = false; updateSubBtn(); return false; }
     try {
       const res = await fetch(`/api/subscribe/status/${USER_ID}`);
       const data = await res.json();
@@ -837,7 +959,10 @@
       subStatusText.textContent = 'Сүлжээний алдаа гарлаа.';
     }
   }
-  subBtn.addEventListener('click', () => { if (!subscriptionActive) openSubModal(); });
+  subBtn.addEventListener('click', () => {
+    if (!USER_ID) { showEntryOverlay(); return; }
+    if (!subscriptionActive) openSubModal();
+  });
   document.getElementById('subModalClose').addEventListener('click', () => {
     subModalBackdrop.classList.remove('open');
     clearInterval(subPollTimer);
