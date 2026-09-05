@@ -11,12 +11,14 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const DATA_FILE = path.join(__dirname, 'videos.json');
 const PAYMENTS_FILE = path.join(__dirname, 'payments.json');
 const SUBSCRIBERS_FILE = path.join(__dirname, 'subscribers.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
 const MANUAL_REQUESTS_FILE = path.join(__dirname, 'manual_requests.json');
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]');
 if (!fs.existsSync(PAYMENTS_FILE)) fs.writeFileSync(PAYMENTS_FILE, '{}');
 if (!fs.existsSync(SUBSCRIBERS_FILE)) fs.writeFileSync(SUBSCRIBERS_FILE, '{}');
+if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '{}');
 if (!fs.existsSync(MANUAL_REQUESTS_FILE)) fs.writeFileSync(MANUAL_REQUESTS_FILE, '[]');
 
 const BANK_TRANSFER_INFO = {
@@ -70,6 +72,13 @@ function readSubscribers() {
 }
 function writeSubscribers(obj) {
   fs.writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(obj, null, 2));
+}
+
+function readUsers() {
+  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8')); } catch (e) { return {}; }
+}
+function writeUsers(obj) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(obj, null, 2));
 }
 
 function readManualRequests() {
@@ -281,6 +290,34 @@ app.post('/api/admin/manual-requests/:id/reject', (req, res) => {
 });
 
 // ---------- Routes ----------
+// ---------- Simple phone-based auth (no SMS verification) ----------
+function normalizePhone(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+app.post('/api/auth/register', (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  const { name } = req.body;
+  if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Нэрээ оруулна уу.' });
+
+  const users = readUsers();
+  if (users[phone]) return res.status(409).json({ error: 'Энэ дугаар аль хэдийн бүртгэлтэй байна. Нэвтэрнэ үү.' });
+
+  users[phone] = { phone, name: name.trim(), createdAt: new Date().toISOString() };
+  writeUsers(users);
+  res.status(201).json(users[phone]);
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
+
+  const users = readUsers();
+  if (!users[phone]) return res.status(404).json({ error: 'Энэ дугаар бүртгэлгүй байна. Эхлээд бүртгүүлнэ үү.' });
+  res.json(users[phone]);
+});
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.get('/api/videos', (req, res) => {
