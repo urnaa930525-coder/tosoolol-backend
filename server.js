@@ -9,9 +9,11 @@ const PORT = process.env.PORT || 3000;
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const DATA_FILE = path.join(__dirname, 'videos.json');
+const PAYMENTS_FILE = path.join(__dirname, 'payments.json');
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]');
+if (!fs.existsSync(PAYMENTS_FILE)) fs.writeFileSync(PAYMENTS_FILE, '{}');
 
 app.use(cors());
 app.use(express.json());
@@ -42,6 +44,97 @@ function readVideos() {
 function writeVideos(list) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2));
 }
+
+function readPayments() {
+  try { return JSON.parse(fs.readFileSync(PAYMENTS_FILE, 'utf-8')); } catch (e) { return {}; }
+}
+function writePayments(obj) {
+  fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(obj, null, 2));
+}
+
+// ---------- QPay integration ----------
+let qpayTokenCache = { token: null, expiresAt: 0 };
+
+async function getQpayToken() {
+  if (qpayTokenCache.token && Date.now() < qpayTokenCache.expiresAt) {
+    return qpayTokenCache.token;
+  }
+  const basicAuth = Buffer.from(`${process.env.QPAY_CLIENT_ID}:${process.env.QPAY_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch(process.env.QPAY_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error('QPay auth failed: ' + res.status);
+  const data = await res.json();
+  qpayTokenCache.token = data.access_token;
+  // refresh a bit before actual expiry
+  const expiresIn = (data.expires_in || 3600) - 60;
+  qpayTokenCache.expiresAt = Date.now() + expiresIn * 1000;
+  return qpayTokenCache.token;
+}
+
+app.post('/api/qpay/create-invoice', async (req, res) => {
+  try {
+    const { amount, description, senderInvoiceNo } = req.body;
+    if (!amount || !description) return res.status(400).json({ error: 'amount, description шаардлагатай.' });
+
+    const token = await getQpayToken();
+    const invoiceNo = senderInvoiceNo || ('INV-' + Date.now());
+    const qpayRes = await fetch('https://merchant.qpay.mn/v2/invoice', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invoice_code: process.env.QPAY_INVOICE_CODE,
+        sender_invoice_no: invoiceNo,
+        invoice_receiver_code: 'terminal',
+        invoice_description: description,
+        amount: amount,
+        callback_url: `${req.protocol}://${req.get('host')}/api/qpay/callback?invoice_no=${invoiceNo}`
+      })
+    });
+    const data = await qpayRes.json();
+    if (!qpayRes.ok) return res.status(400).json({ error: 'QPay invoice үүсгэхэд алдаа гарлаа.', detail: data });
+
+    const payments = readPayments();
+    payments[invoiceNo] = {
+      invoice_id: data.invoice_id,
+      sender_invoice_no: invoiceNo,
+      amount,
+      description,
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    writePayments(payments);
+
+    res.status(201).json({
+      invoice_id: data.invoice_id,
+      sender_invoice_no: invoiceNo,
+      qr_text: data.qr_text,
+      qr_image: data.qr_image,
+      urls: data.urls || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/qpay/callback', (req, res) => {
+  const invoiceNo = req.query.invoice_no;
+  const payments = readPayments();
+  if (invoiceNo && payments[invoiceNo]) {
+    payments[invoiceNo].status = 'PAID';
+    payments[invoiceNo].paidAt = new Date().toISOString();
+    writePayments(payments);
+  }
+  res.status(200).json({ ok: true });
+});
+
+app.get('/api/qpay/status/:senderInvoiceNo', (req, res) => {
+  const payments = readPayments();
+  const record = payments[req.params.senderInvoiceNo];
+  if (!record) return res.status(404).json({ error: 'Олдсонгүй.' });
+  res.json({ status: record.status });
+});
 
 // ---------- Routes ----------
 app.get('/api/health', (req, res) => res.json({ ok: true }));
