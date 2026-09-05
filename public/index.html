@@ -127,6 +127,13 @@
   .sub-modal .qr-status { color: var(--cream-dim); font-size: 0.85rem; margin-bottom: 10px; }
   .sub-modal .qr-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
   .sub-modal .qr-links a { font-size: 0.78rem; color: var(--gold); text-decoration: underline; }
+  .pay-tabs { display: flex; gap: 6px; background: var(--bg-elev-2); border-radius: 999px; padding: 4px; margin-bottom: 18px; }
+  .pay-tab { flex: 1; background: none; border: none; padding: 8px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; color: var(--cream-dim); }
+  .pay-tab.active { background: var(--gold); color: #1A130A; }
+  .bank-info { background: var(--bg-elev-2); border-radius: 14px; padding: 16px; text-align: left; font-size: 0.88rem; line-height: 1.9; margin-bottom: 14px; }
+  .bank-info strong { color: var(--gold); }
+  .bank-confirm-btn { width: 100%; background: var(--gold); color: #1A130A; border: none; padding: 11px; border-radius: 999px; font-weight: 700; font-size: 0.88rem; }
+  .bank-confirm-btn:disabled { opacity: 0.6; }
   .avatar-wrap { position: relative; }
   .profile-menu {
     position: absolute; top: calc(100% + 14px); right: 0; width: 280px;
@@ -423,10 +430,19 @@
     <button class="sub-modal-close" id="subModalClose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
     <h3>Гишүүнчлэл авах</h3>
     <div class="price">6,900₮ / сар</div>
-    <div id="subModalBody">
+    <div class="pay-tabs">
+      <button class="pay-tab active" id="tabQpay">QPay-р төлөх</button>
+      <button class="pay-tab" id="tabBank">Дансаар шилжүүлэх</button>
+    </div>
+    <div id="qpayPane">
       <div class="qr-wrap"><img id="subQrImg" src="" alt="QR"></div>
       <div class="qr-status" id="subStatusText">QPay аппликейшнаар уншуулж төлнө үү…</div>
       <div class="qr-links" id="subLinks"></div>
+    </div>
+    <div id="bankPane" style="display:none;">
+      <div class="bank-info" id="bankInfoBox">Ачаалж байна…</div>
+      <button class="bank-confirm-btn" id="bankConfirmBtn">Шилжүүлсэн</button>
+      <div class="qr-status" id="bankStatusText"></div>
     </div>
   </div>
 </div>
@@ -716,7 +732,56 @@
   const subQrImg = document.getElementById('subQrImg');
   const subStatusText = document.getElementById('subStatusText');
   const subLinks = document.getElementById('subLinks');
+  const tabQpay = document.getElementById('tabQpay');
+  const tabBank = document.getElementById('tabBank');
+  const qpayPane = document.getElementById('qpayPane');
+  const bankPane = document.getElementById('bankPane');
+  const bankInfoBox = document.getElementById('bankInfoBox');
+  const bankConfirmBtn = document.getElementById('bankConfirmBtn');
+  const bankStatusText = document.getElementById('bankStatusText');
   let subPollTimer = null;
+
+  function switchPayTab(tab){
+    tabQpay.classList.toggle('active', tab === 'qpay');
+    tabBank.classList.toggle('active', tab === 'bank');
+    qpayPane.style.display = tab === 'qpay' ? 'block' : 'none';
+    bankPane.style.display = tab === 'bank' ? 'block' : 'none';
+    if (tab === 'bank') loadBankInfo();
+  }
+  tabQpay.addEventListener('click', () => switchPayTab('qpay'));
+  tabBank.addEventListener('click', () => switchPayTab('bank'));
+
+  async function loadBankInfo(){
+    if (bankInfoBox.dataset.loaded) return;
+    try {
+      const res = await fetch('/api/subscribe/bank-info');
+      const data = await res.json();
+      bankInfoBox.innerHTML = `
+        <div><strong>Банк:</strong> ${data.bank}</div>
+        <div><strong>Данс:</strong> ${data.account}</div>
+        <div><strong>Хүлээн авагч:</strong> ${data.holder}</div>
+        <div><strong>Дүн:</strong> ${data.price.toLocaleString()}₮</div>`;
+      bankInfoBox.dataset.loaded = '1';
+    } catch (e) {
+      bankInfoBox.textContent = 'Мэдээлэл ачаалж чадсангүй.';
+    }
+  }
+
+  bankConfirmBtn.addEventListener('click', async () => {
+    bankConfirmBtn.disabled = true;
+    bankStatusText.textContent = 'Илгээж байна…';
+    try {
+      const res = await fetch('/api/subscribe/manual-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: USER_ID })
+      });
+      if (!res.ok) throw new Error();
+      bankStatusText.textContent = 'Хүсэлт бүртгэгдлээ. Шилжүүлгийг шалгаад 24 цагийн дотор гишүүнчлэл идэвхжинэ.';
+    } catch (e) {
+      bankStatusText.textContent = 'Алдаа гарлаа. Дахин оролдоно уу.';
+      bankConfirmBtn.disabled = false;
+    }
+  });
 
   function updateSubBtn(){
     subBtn.textContent = subscriptionActive ? 'Гишүүн ✓' : 'Гишүүнчлэл';
@@ -735,6 +800,9 @@
 
   async function openSubModal(){
     subModalBackdrop.classList.add('open');
+    switchPayTab('qpay');
+    bankStatusText.textContent = '';
+    bankConfirmBtn.disabled = false;
     subStatusText.textContent = 'QR код бэлдэж байна…';
     subQrImg.src = '';
     subLinks.innerHTML = '';
