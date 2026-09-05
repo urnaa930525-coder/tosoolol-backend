@@ -196,7 +196,7 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
 
-    const invoiceNo = `SUB-${userId}-${Date.now()}`;
+    const invoiceNo = `SUB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const data = await createQpayInvoice({
       invoiceNo,
       amount: SUBSCRIPTION_PRICE,
