@@ -76,13 +76,40 @@ async function getQpayToken() {
     method: 'POST',
     headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' }
   });
-  if (!res.ok) throw new Error('QPay auth failed: ' + res.status);
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('QPay auth error:', res.status, errText);
+    throw new Error('QPay auth failed: ' + res.status + ' ' + errText);
+  }
   const data = await res.json();
   qpayTokenCache.token = data.access_token;
-  // refresh a bit before actual expiry
   const expiresIn = (data.expires_in || 3600) - 60;
   qpayTokenCache.expiresAt = Date.now() + expiresIn * 1000;
   return qpayTokenCache.token;
+}
+
+async function createQpayInvoice({ invoiceNo, amount, description, req }) {
+  const token = await getQpayToken();
+  const qpayRes = await fetch('https://merchant.qpay.mn/v2/invoice', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      invoice_code: process.env.QPAY_INVOICE_CODE,
+      sender_invoice_no: invoiceNo,
+      invoice_receiver_code: 'terminal',
+      invoice_description: description,
+      amount: amount,
+      callback_url: `${req.protocol}://${req.get('host')}/api/qpay/callback?invoice_no=${invoiceNo}`
+    })
+  });
+  const data = await qpayRes.json();
+  if (!qpayRes.ok) {
+    console.error('QPay invoice error:', qpayRes.status, JSON.stringify(data));
+    const err = new Error('QPay invoice үүсгэхэд алдаа гарлаа.');
+    err.detail = data;
+    throw err;
+  }
+  return data;
 }
 
 app.post('/api/qpay/create-invoice', async (req, res) => {
@@ -90,22 +117,8 @@ app.post('/api/qpay/create-invoice', async (req, res) => {
     const { amount, description, senderInvoiceNo } = req.body;
     if (!amount || !description) return res.status(400).json({ error: 'amount, description шаардлагатай.' });
 
-    const token = await getQpayToken();
     const invoiceNo = senderInvoiceNo || ('INV-' + Date.now());
-    const qpayRes = await fetch('https://merchant.qpay.mn/v2/invoice', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        invoice_code: process.env.QPAY_INVOICE_CODE,
-        sender_invoice_no: invoiceNo,
-        invoice_receiver_code: 'terminal',
-        invoice_description: description,
-        amount: amount,
-        callback_url: `${req.protocol}://${req.get('host')}/api/qpay/callback?invoice_no=${invoiceNo}`
-      })
-    });
-    const data = await qpayRes.json();
-    if (!qpayRes.ok) return res.status(400).json({ error: 'QPay invoice үүсгэхэд алдаа гарлаа.', detail: data });
+    const data = await createQpayInvoice({ invoiceNo, amount, description, req });
 
     const payments = readPayments();
     payments[invoiceNo] = {
@@ -126,7 +139,7 @@ app.post('/api/qpay/create-invoice', async (req, res) => {
       urls: data.urls || []
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message, detail: err.detail });
   }
 });
 
@@ -138,7 +151,6 @@ app.post('/api/qpay/callback', (req, res) => {
     payments[invoiceNo].paidAt = new Date().toISOString();
     writePayments(payments);
 
-    // If this was a subscription payment, activate/extend membership
     if (invoiceNo.startsWith('SUB-') && payments[invoiceNo].userId) {
       const subscribers = readSubscribers();
       const userId = payments[invoiceNo].userId;
@@ -166,22 +178,13 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
 
-    const token = await getQpayToken();
     const invoiceNo = `SUB-${userId}-${Date.now()}`;
-    const qpayRes = await fetch('https://merchant.qpay.mn/v2/invoice', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        invoice_code: process.env.QPAY_INVOICE_CODE,
-        sender_invoice_no: invoiceNo,
-        invoice_receiver_code: 'terminal',
-        invoice_description: 'Гишүүнчлэл - 1 сар',
-        amount: SUBSCRIPTION_PRICE,
-        callback_url: `${req.protocol}://${req.get('host')}/api/qpay/callback?invoice_no=${invoiceNo}`
-      })
+    const data = await createQpayInvoice({
+      invoiceNo,
+      amount: SUBSCRIPTION_PRICE,
+      description: 'Гишүүнчлэл - 1 сар',
+      req
     });
-    const data = await qpayRes.json();
-    if (!qpayRes.ok) return res.status(400).json({ error: 'QPay invoice үүсгэхэд алдаа гарлаа.', detail: data });
 
     const payments = readPayments();
     payments[invoiceNo] = {
@@ -203,7 +206,7 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
       urls: data.urls || []
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message, detail: err.detail });
   }
 });
 
