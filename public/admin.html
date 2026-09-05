@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<title>ТӨСӨӨЛӨЛ — Админ Upload</title>
+<style>
+  body { font-family: sans-serif; max-width: 560px; margin: 40px auto; background: #10191C; color: #F2ECE0; padding: 0 20px; }
+  h1 { font-size: 1.4rem; }
+  label { display: block; margin-top: 14px; font-size: 0.85rem; color: #9DAEAF; }
+  input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: #fff; box-sizing: border-box; }
+  button { margin-top: 20px; padding: 10px 20px; background: #E3A24B; color: #1a130a; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+  #result { margin-top: 20px; padding: 12px; border-radius: 8px; background: #1a2a26; font-size: 0.85rem; white-space: pre-wrap; }
+  #list { margin-top: 30px; }
+  .vid { padding: 10px; background: #17242a; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+  .vid button { margin: 0; padding: 4px 10px; background: #C9604C; font-size: 0.75rem; }
+</style>
+</head>
+<body>
+  <h1>ТӨСӨӨЛӨЛ — Видео Upload (Admin)</h1>
+  <form id="uploadForm">
+    <label>Нэр (title)</label>
+    <input type="text" name="title" required>
+    <label>Ангилал (category)</label>
+    <select name="category">
+      <option value="ai">AI кино</option>
+      <option value="movie">Кино</option>
+      <option value="series">Цуврал</option>
+      <option value="show">Нэвтрүүлэг</option>
+    </select>
+    <label>Тайлбар (description)</label>
+    <textarea name="description" rows="3"></textarea>
+    <label>Badge (жишээ: 6:20, 1ц 42м, 5-р анги)</label>
+    <input type="text" name="badge">
+    <label>Видео файл (mp4, webm, mov, mkv)</label>
+    <input type="file" name="video" accept="video/*" required>
+    <button type="submit">Upload хийх</button>
+  </form>
+  <div id="result"></div>
+  <div id="list"></div>
+
+<script>
+const form = document.getElementById('uploadForm');
+const result = document.getElementById('result');
+const listEl = document.getElementById('list');
+
+async function loadVideos() {
+  const res = await fetch('/api/videos');
+  const videos = await res.json();
+  listEl.innerHTML = '<h3>Байршуулсан видеонууд (' + videos.length + ')</h3>' +
+    videos.map(v => `<div class="vid"><span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)</span><button onclick="delVideo(${v.id})">Устгах</button></div>`).join('');
+}
+
+async function delVideo(id) {
+  await fetch('/api/videos/' + id, { method: 'DELETE' });
+  loadVideos();
+}
+window.delVideo = delVideo;
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  result.textContent = 'Uploading...';
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: new FormData(form) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Алдаа');
+    result.textContent = 'Амжилттай! ID: ' + data.id + '\nURL: ' + data.url;
+    form.reset();
+    loadVideos();
+  } catch (err) {
+    result.textContent = 'Алдаа: ' + err.message;
+  }
+});
+
+loadVideos();
+</script>
+</body>
+</html>
