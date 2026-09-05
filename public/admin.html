@@ -38,10 +38,37 @@
   <div id="result"></div>
   <div id="list"></div>
 
+  <h3 style="margin-top:40px;">Дансаар шилжүүлсэн хүсэлтүүд</h3>
+  <div id="manualRequests"></div>
+
 <script>
 const form = document.getElementById('uploadForm');
 const result = document.getElementById('result');
 const listEl = document.getElementById('list');
+const manualEl = document.getElementById('manualRequests');
+
+async function loadManualRequests() {
+  const res = await fetch('/api/admin/manual-requests');
+  const reqs = await res.json();
+  manualEl.innerHTML = reqs.slice().reverse().map(r => `
+    <div class="vid">
+      <span>${r.userId.slice(0,8)}… — ${r.amount}₮ — ${r.status} — ${new Date(r.createdAt).toLocaleString()}</span>
+      ${r.status === 'pending' ? `<span>
+        <button onclick="approveReq(${r.id})">Батлах</button>
+        <button onclick="rejectReq(${r.id})" style="background:#555;">Цуцлах</button>
+      </span>` : ''}
+    </div>`).join('') || '<p style="color:#9DAEAF;">Хүсэлт алга.</p>';
+}
+async function approveReq(id) {
+  await fetch(`/api/admin/manual-requests/${id}/approve`, { method: 'POST' });
+  loadManualRequests();
+}
+async function rejectReq(id) {
+  await fetch(`/api/admin/manual-requests/${id}/reject`, { method: 'POST' });
+  loadManualRequests();
+}
+window.approveReq = approveReq;
+window.rejectReq = rejectReq;
 
 async function loadVideos() {
   const res = await fetch('/api/videos');
@@ -72,6 +99,7 @@ form.addEventListener('submit', async (e) => {
 });
 
 loadVideos();
+loadManualRequests();
 </script>
 </body>
 </html>
