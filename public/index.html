@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ТӨСӨӨЛӨЛ — Кино, Цуврал, AI контент</title>
+<title>NextKino — Кино, Цуврал, AI контент</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -60,6 +60,10 @@
     padding: 4px 12px 28px; letter-spacing: 0.01em;
   }
   .sidebar-brand span { color: var(--rose); }
+  .brand-mark { display: inline-flex; align-items: center; gap: 4px; }
+  .brand-next { color: var(--cream); }
+  .brand-kino { color: var(--violet); }
+  .brand-cam { flex-shrink: 0; }
   .nav-group { margin-bottom: 20px; }
   .nav-item {
     display: flex; align-items: center; gap: 12px; width: 100%;
@@ -323,7 +327,7 @@
 
 <div class="entry-overlay" id="entryOverlay">
   <div class="entry-inner">
-    <div class="entry-brand">ТӨСӨӨ<span>ЛӨЛ</span></div>
+    <div class="entry-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <p class="entry-tagline">Your Story Begins Here</p>
     <p class="entry-sub">Сэтгэл хөдөлгөх кино, цуврал контентуудыг нэг дороос үзээрэй.</p>
 
@@ -350,7 +354,7 @@
 
 <div class="app">
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand">ТӨСӨӨ<span>ЛӨЛ</span></div>
+    <div class="sidebar-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <div class="nav-group" id="mainNav"></div>
     <div class="nav-divider"></div>
     <div class="nav-group">
