@@ -103,6 +103,30 @@
   }
   .icon-round:hover { color: var(--cream); }
   .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--rose), var(--violet)); border: none; padding: 0; }
+  .sub-btn {
+    background: var(--gold); color: #1A130A; border: none; padding: 9px 16px;
+    border-radius: 999px; font-size: 0.82rem; font-weight: 700; white-space: nowrap;
+  }
+  .sub-btn.active { background: var(--bg-elev-2); color: var(--gold); }
+  .sub-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(6,6,12,0.82); display: none;
+    align-items: center; justify-content: center; z-index: 200; padding: 24px;
+  }
+  .sub-modal-backdrop.open { display: flex; }
+  .sub-modal {
+    width: 100%; max-width: 380px; background: var(--bg-elev); border-radius: 20px;
+    padding: 28px; text-align: center; position: relative;
+  }
+  .sub-modal-close {
+    position: absolute; top: 14px; right: 14px; background: none; border: none; color: var(--cream-dim);
+  }
+  .sub-modal h3 { margin: 0 0 6px; font-size: 1.2rem; }
+  .sub-modal .price { color: var(--gold); font-weight: 700; font-size: 1.5rem; margin: 4px 0 18px; }
+  .sub-modal .qr-wrap { background: #fff; border-radius: 14px; padding: 14px; margin: 0 auto 16px; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
+  .sub-modal .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .sub-modal .qr-status { color: var(--cream-dim); font-size: 0.85rem; margin-bottom: 10px; }
+  .sub-modal .qr-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .sub-modal .qr-links a { font-size: 0.78rem; color: var(--gold); text-decoration: underline; }
   .avatar-wrap { position: relative; }
   .profile-menu {
     position: absolute; top: calc(100% + 14px); right: 0; width: 280px;
@@ -280,6 +304,7 @@
         <input id="searchInput" type="text" placeholder="Хайх…">
       </div>
       <div class="top-icons">
+        <button class="sub-btn" id="subBtn">Гишүүнчлэл</button>
         <button class="icon-round" id="themeToggle" title="Өнгө солих"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
         <button class="icon-round"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
         <button class="icon-round"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></button>
@@ -389,6 +414,19 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="sub-modal-backdrop" id="subModalBackdrop">
+  <div class="sub-modal">
+    <button class="sub-modal-close" id="subModalClose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+    <h3>Гишүүнчлэл авах</h3>
+    <div class="price">6,900₮ / сар</div>
+    <div id="subModalBody">
+      <div class="qr-wrap"><img id="subQrImg" src="" alt="QR"></div>
+      <div class="qr-status" id="subStatusText">QPay аппликейшнаар уншуулж төлнө үү…</div>
+      <div class="qr-links" id="subLinks"></div>
     </div>
   </div>
 </div>
@@ -608,6 +646,7 @@
   function smallIcon(p){ return p ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg>'; }
 
   function openPlayer(id){
+    if (!subscriptionActive) { openSubModal(); return; }
     curVideo = allVideos().find(v => v.id === id);
     document.getElementById('modalTitle').textContent = curVideo.title;
     document.getElementById('modalDesc').textContent = curVideo.desc;
@@ -660,6 +699,78 @@
     const cur = document.documentElement.getAttribute('data-theme');
     document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
   });
+
+  // ---------- Subscription ----------
+  function getUserId(){
+    let id = localStorage.getItem('tosoolol_user_id');
+    if (!id) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+      localStorage.setItem('tosoolol_user_id', id);
+    }
+    return id;
+  }
+  const USER_ID = getUserId();
+  let subscriptionActive = false;
+  const subBtn = document.getElementById('subBtn');
+  const subModalBackdrop = document.getElementById('subModalBackdrop');
+  const subQrImg = document.getElementById('subQrImg');
+  const subStatusText = document.getElementById('subStatusText');
+  const subLinks = document.getElementById('subLinks');
+  let subPollTimer = null;
+
+  function updateSubBtn(){
+    subBtn.textContent = subscriptionActive ? 'Гишүүн ✓' : 'Гишүүнчлэл';
+    subBtn.classList.toggle('active', subscriptionActive);
+  }
+
+  async function checkSubscription(){
+    try {
+      const res = await fetch(`/api/subscribe/status/${USER_ID}`);
+      const data = await res.json();
+      subscriptionActive = !!data.active;
+      updateSubBtn();
+      return subscriptionActive;
+    } catch (e) { return false; }
+  }
+
+  async function openSubModal(){
+    subModalBackdrop.classList.add('open');
+    subStatusText.textContent = 'QR код бэлдэж байна…';
+    subQrImg.src = '';
+    subLinks.innerHTML = '';
+    try {
+      const res = await fetch('/api/subscribe/create-invoice', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: USER_ID })
+      });
+      const data = await res.json();
+      if (!res.ok) { subStatusText.textContent = 'Алдаа: ' + (data.error || 'invoice үүсгэж чадсангүй'); return; }
+      subQrImg.src = 'data:image/png;base64,' + data.qr_image;
+      subStatusText.textContent = 'QPay аппликейшнаар уншуулж төлнө үү…';
+      (data.urls || []).forEach(u => {
+        const a = document.createElement('a');
+        a.href = u.link || u.url || '#'; a.textContent = u.name || u.description || 'Апп нээх'; a.target = '_blank';
+        subLinks.appendChild(a);
+      });
+      clearInterval(subPollTimer);
+      subPollTimer = setInterval(async () => {
+        const active = await checkSubscription();
+        if (active) {
+          clearInterval(subPollTimer);
+          subStatusText.textContent = 'Амжилттай төлөгдлөө! 🎉';
+          setTimeout(() => subModalBackdrop.classList.remove('open'), 1200);
+        }
+      }, 3000);
+    } catch (e) {
+      subStatusText.textContent = 'Сүлжээний алдаа гарлаа.';
+    }
+  }
+  subBtn.addEventListener('click', () => { if (!subscriptionActive) openSubModal(); });
+  document.getElementById('subModalClose').addEventListener('click', () => {
+    subModalBackdrop.classList.remove('open');
+    clearInterval(subPollTimer);
+  });
+  checkSubscription();
 
   // ---------- Profile menu ----------
   const avatarBtn = document.getElementById('avatarBtn');
