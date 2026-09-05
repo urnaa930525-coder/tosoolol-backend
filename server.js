@@ -10,10 +10,15 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const DATA_FILE = path.join(__dirname, 'videos.json');
 const PAYMENTS_FILE = path.join(__dirname, 'payments.json');
+const SUBSCRIBERS_FILE = path.join(__dirname, 'subscribers.json');
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]');
 if (!fs.existsSync(PAYMENTS_FILE)) fs.writeFileSync(PAYMENTS_FILE, '{}');
+if (!fs.existsSync(SUBSCRIBERS_FILE)) fs.writeFileSync(SUBSCRIBERS_FILE, '{}');
+
+const SUBSCRIPTION_PRICE = 6900;
+const SUBSCRIPTION_DAYS = 30;
 
 app.use(cors());
 app.use(express.json());
@@ -50,6 +55,13 @@ function readPayments() {
 }
 function writePayments(obj) {
   fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(obj, null, 2));
+}
+
+function readSubscribers() {
+  try { return JSON.parse(fs.readFileSync(SUBSCRIBERS_FILE, 'utf-8')); } catch (e) { return {}; }
+}
+function writeSubscribers(obj) {
+  fs.writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(obj, null, 2));
 }
 
 // ---------- QPay integration ----------
@@ -125,6 +137,19 @@ app.post('/api/qpay/callback', (req, res) => {
     payments[invoiceNo].status = 'PAID';
     payments[invoiceNo].paidAt = new Date().toISOString();
     writePayments(payments);
+
+    // If this was a subscription payment, activate/extend membership
+    if (invoiceNo.startsWith('SUB-') && payments[invoiceNo].userId) {
+      const subscribers = readSubscribers();
+      const userId = payments[invoiceNo].userId;
+      const now = new Date();
+      const current = subscribers[userId] && new Date(subscribers[userId].expiresAt) > now
+        ? new Date(subscribers[userId].expiresAt)
+        : now;
+      current.setDate(current.getDate() + SUBSCRIPTION_DAYS);
+      subscribers[userId] = { expiresAt: current.toISOString(), lastPaidAt: now.toISOString() };
+      writeSubscribers(subscribers);
+    }
   }
   res.status(200).json({ ok: true });
 });
@@ -134,6 +159,59 @@ app.get('/api/qpay/status/:senderInvoiceNo', (req, res) => {
   const record = payments[req.params.senderInvoiceNo];
   if (!record) return res.status(404).json({ error: 'Олдсонгүй.' });
   res.json({ status: record.status });
+});
+
+app.post('/api/subscribe/create-invoice', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
+
+    const token = await getQpayToken();
+    const invoiceNo = `SUB-${userId}-${Date.now()}`;
+    const qpayRes = await fetch('https://merchant.qpay.mn/v2/invoice', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invoice_code: process.env.QPAY_INVOICE_CODE,
+        sender_invoice_no: invoiceNo,
+        invoice_receiver_code: 'terminal',
+        invoice_description: 'Гишүүнчлэл - 1 сар',
+        amount: SUBSCRIPTION_PRICE,
+        callback_url: `${req.protocol}://${req.get('host')}/api/qpay/callback?invoice_no=${invoiceNo}`
+      })
+    });
+    const data = await qpayRes.json();
+    if (!qpayRes.ok) return res.status(400).json({ error: 'QPay invoice үүсгэхэд алдаа гарлаа.', detail: data });
+
+    const payments = readPayments();
+    payments[invoiceNo] = {
+      invoice_id: data.invoice_id,
+      sender_invoice_no: invoiceNo,
+      amount: SUBSCRIPTION_PRICE,
+      description: 'Гишүүнчлэл - 1 сар',
+      userId,
+      status: 'PENDING',
+      createdAt: new Date().toISOString()
+    };
+    writePayments(payments);
+
+    res.status(201).json({
+      invoice_id: data.invoice_id,
+      sender_invoice_no: invoiceNo,
+      qr_text: data.qr_text,
+      qr_image: data.qr_image,
+      urls: data.urls || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/subscribe/status/:userId', (req, res) => {
+  const subscribers = readSubscribers();
+  const record = subscribers[req.params.userId];
+  const active = !!record && new Date(record.expiresAt) > new Date();
+  res.json({ active, expiresAt: record ? record.expiresAt : null, price: SUBSCRIPTION_PRICE });
 });
 
 // ---------- Routes ----------
