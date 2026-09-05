@@ -744,7 +744,11 @@
         body: JSON.stringify({ userId: USER_ID })
       });
       const data = await res.json();
-      if (!res.ok) { subStatusText.textContent = 'Алдаа: ' + (data.error || 'invoice үүсгэж чадсангүй'); return; }
+      if (!res.ok) {
+        const detailMsg = data.detail ? (' — ' + JSON.stringify(data.detail)) : '';
+        subStatusText.textContent = 'Алдаа: ' + (data.error || 'invoice үүсгэж чадсангүй') + detailMsg;
+        return;
+      }
       subQrImg.src = 'data:image/png;base64,' + data.qr_image;
       subStatusText.textContent = 'QPay аппликейшнаар уншуулж төлнө үү…';
       (data.urls || []).forEach(u => {
