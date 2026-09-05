@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ТӨСӨӨЛӨЛ — Кино, Цуврал, AI контент</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0C0C16;
+    --sidebar: #0C0C16;
+    --bg-elev: #17172699;
+    --bg-elev-2: #1E1E30;
+    --gold: #FFC857;
+    --gold-dim: #E0A93E;
+    --rose: #FF6B6B;
+    --teal: #4ECDC4;
+    --violet: #A78BFA;
+    --cream: #F6F4FB;
+    --cream-dim: #8E8BA6;
+    --line: rgba(246,244,251,0.06);
+    --c-ai: #A78BFA;
+    --c-movie: #FF6B6B;
+    --c-series: #4ECDC4;
+    --c-show: #FFC857;
+  }
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #FAF9F5; --sidebar: #FAF9F5; --bg-elev: #FFFFFF; --bg-elev-2: #F0EEFB;
+      --cream: #17172A; --cream-dim: #6E6C86; --line: rgba(23,23,42,0.08);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FAF9F5; --sidebar: #FAF9F5; --bg-elev: #FFFFFF; --bg-elev-2: #F0EEFB;
+    --cream: #17172A; --cream-dim: #6E6C86; --line: rgba(23,23,42,0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--cream);
+    font-family: 'Work Sans', sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3,.display { font-family: 'Fraunces', serif; }
+  button { font-family: inherit; cursor: pointer; }
+  ::selection { background: var(--gold); color: #16241F; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 216px; flex-shrink: 0; background: var(--sidebar);
+    padding: 28px 14px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .sidebar-brand {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem;
+    padding: 4px 12px 28px; letter-spacing: 0.01em;
+  }
+  .sidebar-brand span { color: var(--rose); }
+  .nav-group { margin-bottom: 20px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: none; border: none; color: var(--cream-dim);
+    padding: 9px 12px; border-radius: 10px; font-size: 0.9rem; font-weight: 500;
+    text-align: left; transition: color .15s;
+  }
+  .nav-item svg { flex-shrink: 0; opacity: 0.8; }
+  .nav-item:hover { color: var(--cream); }
+  .nav-item.active { color: var(--cream); background: none; position: relative; }
+  .nav-item.active svg { opacity: 1; color: var(--rose); }
+  .nav-divider { height: 1px; background: var(--line); margin: 16px 10px; }
+
+  @media (max-width: 880px) {
+    .sidebar { position: fixed; z-index: 60; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,0.4); }
+    .sidebar.open { transform: translateX(0); }
+  }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; }
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 16px;
+    padding: 22px 36px 14px; background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(10px);
+  }
+  .menu-btn { display: none; background: none; border: none; color: var(--cream); }
+  @media (max-width: 880px) { .menu-btn { display: flex; } }
+  .search-box { position: relative; flex: 1; max-width: 380px; }
+  .search-box input {
+    width: 100%; padding: 9px 16px 9px 34px; background: none;
+    border: none; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--cream);
+    font-size: 0.92rem; outline: none; transition: border-color .15s;
+  }
+  .search-box input:focus { border-color: var(--rose); }
+  .search-box svg { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); opacity: 0.5; }
+  .top-icons { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+  .icon-round {
+    width: auto; height: auto; background: none;
+    border: none; display: flex; align-items: center; justify-content: center; color: var(--cream-dim);
+  }
+  .icon-round:hover { color: var(--cream); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--rose), var(--violet)); border: none; padding: 0; }
+  .avatar-wrap { position: relative; }
+  .profile-menu {
+    position: absolute; top: calc(100% + 14px); right: 0; width: 280px;
+    background: var(--bg-elev-2); border-radius: 16px; padding: 20px 18px 10px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.4); opacity: 0; visibility: hidden;
+    transform: translateY(-6px); transition: opacity .15s, transform .15s, visibility .15s;
+    z-index: 50;
+  }
+  .profile-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
+  .profile-top { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .profile-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--rose), var(--violet));
+    border: 2px solid var(--violet); box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 18%, transparent);
+  }
+  .profile-id {
+    background: var(--violet); color: #fff; font-size: 0.72rem; font-weight: 700;
+    padding: 4px 14px; border-radius: 999px;
+  }
+  .profile-stats { display: flex; justify-content: space-around; text-align: center; margin-bottom: 16px; }
+  .profile-stats strong { display: block; font-size: 1.15rem; font-weight: 700; color: var(--cream); }
+  .profile-stats span { font-size: 0.64rem; color: var(--cream-dim); letter-spacing: 0.04em; text-transform: uppercase; }
+  .profile-divider { height: 1px; background: var(--line); margin-bottom: 8px; }
+  .profile-item {
+    display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+    background: none; border: none; color: var(--cream-dim); padding: 10px 6px; border-radius: 10px;
+  }
+  .profile-item:hover { background: color-mix(in srgb, var(--cream) 6%, transparent); color: var(--cream); }
+  .profile-item svg { flex-shrink: 0; margin-top: 1px; opacity: 0.85; }
+  .profile-item span { display: flex; flex-direction: column; font-size: 0.78rem; line-height: 1.4; }
+  .profile-item span strong { font-size: 0.86rem; font-weight: 600; color: var(--cream); margin-bottom: 1px; }
+
+  .content { padding: 6px 36px 60px; }
+
+  /* ---------- Hero banner ---------- */
+  .hero {
+    position: relative; border-radius: 22px; overflow: hidden;
+    min-height: 280px; display: flex; align-items: center; margin-top: 20px;
+  }
+  .hero-canvas { position: absolute; inset: 0; z-index: 0; }
+  .hero-scrim { position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(90deg, var(--bg) 8%, color-mix(in srgb, var(--bg) 20%, transparent) 50%, transparent 85%); }
+  .hero-content { position: relative; z-index: 2; padding: 40px 44px; max-width: 480px; }
+  .hero-tag {
+    display: inline-block; color: var(--rose); font-weight: 700;
+    font-size: 0.72rem; margin-bottom: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .hero h2.display { font-size: 2.2rem; line-height: 1.15; font-weight: 600; margin: 0 0 10px; }
+  .hero p.sub { color: var(--cream-dim); font-weight: 500; font-size: 0.95rem; margin: 0 0 22px; }
+  .hero-actions { display: flex; gap: 14px; align-items: center; }
+  .btn-play {
+    display: flex; align-items: center; gap: 10px; background: var(--cream); color: #0C0C16;
+    border: none; padding: 11px 22px; border-radius: 999px; font-weight: 600; font-size: 0.9rem;
+  }
+  .btn-ghost {
+    background: none; border: none; color: var(--cream);
+    padding: 11px 6px; font-weight: 500; font-size: 0.88rem; text-decoration: underline; text-underline-offset: 4px;
+  }
+  @media (max-width: 640px) { .hero { min-height: 220px; } .hero h2.display { font-size: 1.5rem; } }
+
+  /* ---------- Tagline banner ---------- */
+  .tagline {
+    padding: 8px 6px 34px;
+  }
+  .tagline-title {
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 3rem;
+    line-height: 1.05; margin: 0 0 14px; color: var(--rose);
+    letter-spacing: -0.01em;
+  }
+  .tagline-sub {
+    color: var(--cream-dim); font-size: 1rem; line-height: 1.6;
+    max-width: 620px; margin: 0;
+  }
+  @media (max-width: 640px) {
+    .tagline-title { font-size: 2rem; }
+    .tagline-sub { font-size: 0.9rem; }
+  }
+
+  /* ---------- Rows ---------- */
+  .row { margin-top: 40px; }
+  .row-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .row-head h3 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+  .row-head span { color: var(--cream-dim); font-size: 0.82rem; }
+  .grid-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+  .grid-row::-webkit-scrollbar { height: 6px; }
+  .grid-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+  .poster {
+    flex: 0 0 165px; scroll-snap-align: start; cursor: pointer;
+    border-radius: 14px; overflow: hidden; position: relative; aspect-ratio: 2/3;
+    transition: transform .18s;
+  }
+  .poster:hover { transform: translateY(-6px); }
+  .poster svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .poster-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,6,12,0.95) 100%); }
+  .poster-badge {
+    position: absolute; left: 9px; top: 9px; color: #0C0C16;
+    font-size: 0.64rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  }
+  .poster-fav {
+    position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(6,6,12,0.5); border: none; display: flex; align-items: center; justify-content: center; color: #F6F4FB;
+  }
+  .poster-fav[data-fav="1"] svg { fill: var(--rose); stroke: var(--rose); }
+  .poster-title {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; font-size: 0.83rem; font-weight: 600; line-height: 1.25;
+  }
+
+  .empty-msg { color: var(--cream-dim); font-size: 0.92rem; padding: 20px 0; }
+
+  /* ---------- Modal player ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(6,10,9,0.82); display: none;
+    align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal { width: 100%; max-width: 780px; background: var(--bg-elev); border-radius: 16px; overflow: visible; }
+  .player-stage { position: relative; width: 100%; aspect-ratio: 16/9; background: #0A100E; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 16px 16px 0 0; }
+  .player-stage svg { width: 100%; height: 100%; }
+  .player-toggle { position: absolute; inset: 0; background: none; border: none; display: flex; align-items: center; justify-content: center; }
+  .player-toggle .ring { width: 70px; height: 70px; border-radius: 50%; background: rgba(20,26,23,0.55); border: 1px solid rgba(242,236,224,0.35); display: flex; align-items: center; justify-content: center; }
+  .player-bar { padding: 14px 18px; }
+  .progress-track { width: 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; cursor: pointer; }
+  .progress-fill { height: 100%; background: var(--gold); width: 0%; transition: width .2s linear; }
+  .player-controls { display: flex; align-items: center; gap: 14px; }
+  .player-controls .time { font-size: 0.78rem; color: var(--cream-dim); font-variant-numeric: tabular-nums; }
+  .icon-btn { background: none; border: none; color: var(--cream); padding: 4px; display: flex; }
+  .modal-info { padding: 4px 18px 22px; }
+  .modal-info-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .modal-info h3 { margin: 0 0 6px; font-size: 1.2rem; }
+  .modal-info p { margin: 0; color: var(--cream-dim); font-size: 0.86rem; max-width: 420px; }
+  .list-wrap { position: relative; flex-shrink: 0; }
+  .list-btn {
+    display: flex; align-items: center; gap: 8px; background: var(--bg-elev-2); border: none;
+    color: var(--cream); padding: 9px 14px; border-radius: 999px; font-size: 0.82rem; font-weight: 500; white-space: nowrap;
+  }
+  .list-btn:hover { background: color-mix(in srgb, var(--bg-elev-2) 70%, var(--cream) 10%); }
+  .list-menu {
+    position: absolute; top: calc(100% + 10px); right: 0; width: 200px;
+    background: var(--bg-elev-2); border-radius: 14px; padding: 8px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.4); opacity: 0; visibility: hidden;
+    transform: translateY(-6px); transition: opacity .15s, transform .15s, visibility .15s; z-index: 20;
+  }
+  .list-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
+  .list-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: none; border: none; color: var(--cream); padding: 9px 10px; border-radius: 9px; font-size: 0.84rem; font-weight: 500;
+  }
+  .list-item:hover { background: color-mix(in srgb, var(--cream) 6%, transparent); }
+  .list-item.selected { background: color-mix(in srgb, var(--cream) 8%, transparent); }
+  .list-item svg { flex-shrink: 0; }
+  .modal-close { position: absolute; top: 14px; right: 14px; z-index: 3; background: rgba(10,14,12,0.55); border: none; color: #F2ECE0; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">ТӨСӨӨ<span>ЛӨЛ</span></div>
+    <div class="nav-group" id="mainNav"></div>
+    <div class="nav-divider"></div>
+    <div class="nav-group">
+      <button class="nav-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>Бидний тухай</button>
+      <button class="nav-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Эрх нээлгэх</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <div class="search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" type="text" placeholder="Хайх…">
+      </div>
+      <div class="top-icons">
+        <button class="icon-round" id="themeToggle" title="Өнгө солих"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+        <button class="icon-round"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+        <button class="icon-round"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></button>
+        <div class="avatar-wrap">
+          <button class="avatar" id="avatarBtn"></button>
+          <div class="profile-menu" id="profileMenu">
+            <div class="profile-top">
+              <div class="profile-avatar"></div>
+              <span class="profile-id">ID: 788460</span>
+            </div>
+            <div class="profile-stats">
+              <div><strong>14</strong><span>Үлдсэн хоног</span></div>
+              <div><strong>9000</strong><span>Цуглуулсан XP</span></div>
+            </div>
+            <div class="profile-divider"></div>
+            <button class="profile-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.65 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.65 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.65a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 0 1 4 0v.09A1.7 1.7 0 0 0 15 4.65a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.35 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.04z"/></svg>
+              <span><strong>Тохиргоо</strong>Аккаунт тохиргоог хийнэ үү.</span>
+            </button>
+            <button class="profile-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span><strong>Тусламж &amp; эрх нээлгэх</strong>Тусламж болон эрх нээлгэх тухай.</span>
+            </button>
+            <button class="profile-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>
+              <span><strong>Бичлэг оруулах</strong>Та бичлэгээ оруулаарай.</span>
+            </button>
+            <button class="profile-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+              <span><strong>Гарах</strong>Системээс гарах.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <section class="tagline">
+        <h1 class="tagline-title">Your Story Begins Here</h1>
+        <p class="tagline-sub">Сэтгэл хөдөлгөх кино, цуврал контентуудыг нэг л удаа төлж, хүссэнээрээ хязгааргүй үзээрэй.</p>
+      </section>
+
+      <section class="hero" id="hero">
+        <div class="hero-canvas" id="heroCanvas"></div>
+        <div class="hero-scrim"></div>
+        <div class="hero-content">
+          <span class="hero-tag" id="heroTag">ШИНЭЭР НЭМЭГДЛЭЭ</span>
+          <h2 class="display" id="heroTitle"></h2>
+          <p class="sub" id="heroDesc"></p>
+          <div class="hero-actions">
+            <button class="btn-play" id="heroPlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>Үзэх</button>
+            <button class="btn-ghost" id="heroInfo">Дэлгэрэнгүй</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="rows"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="player-stage" id="playerStage">
+      <button class="modal-close" id="modalClose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+      <div id="playerArt"></div>
+      <button class="player-toggle" id="playerToggle"><div class="ring" id="playRing"></div></button>
+    </div>
+    <div class="player-bar">
+      <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="player-controls">
+        <button class="icon-btn" id="ctrlPlay"></button>
+        <span class="time" id="timeLabel">0:00 / 0:00</span>
+      </div>
+    </div>
+    <div class="modal-info">
+      <div class="modal-info-head">
+        <div>
+          <h3 id="modalTitle"></h3>
+          <p id="modalDesc"></p>
+        </div>
+        <div class="list-wrap">
+          <button class="list-btn" id="listBtn"><span id="listBtnLabel">Жагсаалтад нэмэх</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </button>
+          <div class="list-menu" id="listMenu">
+            <button class="list-item" data-status="notify">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              Мэдэгдэл авах
+            </button>
+            <button class="list-item" data-status="later">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+              Дараа үзэх
+            </button>
+            <button class="list-item" data-status="done" style="color:var(--c-series)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>
+              Үзэж дууссан
+            </button>
+            <button class="list-item" data-status="watching" style="color:var(--c-show)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg>
+              Үзэж байгаа
+            </button>
+            <button class="list-item" data-status="unwatched" style="color:var(--c-movie)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+              Үзээгүй цуврал
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- Nav / categories ----------
+  const CATS = [
+    { id:'all', label:'Нүүр хуудас', icon:'<circle cx="12" cy="12" r="9"/>' },
+    { id:'series', label:'Цуврал', icon:'<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/>' },
+    { id:'movie', label:'Кино', icon:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/>' },
+    { id:'show', label:'Нэвтрүүлэг', icon:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.4"/>' },
+    { id:'ai', label:'AI кино', icon:'<path d="M12 3l2.2 4.9L19 10l-4.8 2.1L12 17l-2.2-4.9L5 10l4.8-2.1z"/>' },
+    { id:'fav', label:'Таалагдсан', icon:'<path d="M12 21s-7-4.5-9.5-9C.5 8 2 4 6 4c2 0 3.5 1.2 4 2.2C10.5 5.2 12 4 14 4c4 0 5.5 4 3.5 8-2.5 4.5-9.5 9-9.5 9z"/>' },
+    { id:'later', label:'Дараа үзэх', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>' },
+    { id:'history', label:'Үзсэн түүх', icon:'<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/>' }
+  ];
+
+  // ---------- Backend-uploaded videos ----------
+  const API_BASE = '';
+  let uploadedVideos = [];
+  async function loadUploadedVideos(){
+    try {
+      const res = await fetch(API_BASE + '/api/videos');
+      if (!res.ok) return;
+      const list = await res.json();
+      uploadedVideos = list.map(v => ({
+        id: 'up-' + v.id,
+        cat: v.category,
+        sub: CATS.find(c => c.id === v.category)?.label || v.category,
+        title: v.title,
+        desc: v.description || '',
+        badge: v.badge || '',
+        dur: 0,
+        hue: (v.id % 360),
+        videoUrl: API_BASE + v.url,
+        isUploaded: true
+      }));
+    } catch (e) {
+      // backend unreachable (e.g. sleeping) — silently skip, demo content still shows
+    }
+  }
+
+  // ---------- Content data ----------
+  const VIDEOS = [
+    { id:1, cat:'ai', sub:'Анимэйшн', title:'Сарны Дуу', desc:'Тэнгэрт мөнхөрсөн сарны бүжигт уригдсан охины түүх.', badge:'6:20', dur:380, hue:38 },
+    { id:2, cat:'ai', sub:'Анимэйшн', title:'Талын Ботго', desc:'Талын өргөн уудамд ганцаараа өссөн ботгоны адал явдал.', badge:'8:45', dur:525, hue:150 },
+    { id:3, cat:'ai', sub:'Анимэйшн', title:'Гэрлийн Хот', desc:'Шөнийн хотын гэрэлд амилсан жижиг амьтдын ертөнц.', badge:'5:10', dur:310, hue:280 },
+    { id:4, cat:'ai', sub:'Богино кино', title:'Сүүлчийн Буудал', desc:'Галт тэрэгний сүүлчийн буудал дээр тохиолдсон санамсаргүй уулзалт.', badge:'14:20', dur:860, hue:10 },
+    { id:5, cat:'ai', sub:'Богино кино', title:'Хоёр Дахь Амьдрал', desc:'Хуучин байшинд амьдардаг хоёр үеийн хоорондох дуугүй яриа.', badge:'16:40', dur:1000, hue:260 },
+    { id:6, cat:'ai', sub:'Клип', title:'Хотын Судал', desc:'Мегаполисын амьсгал, өдрөөс шөнө хүртэлх хэмнэл.', badge:'2:30', dur:150, hue:340 },
+    { id:7, cat:'ai', sub:'Клип', title:'Гэрлийн Тоглоом', desc:'Неон гэрлүүдийн хэмнэлтэй бүжиг.', badge:'3:10', dur:190, hue:300 },
+    { id:8, cat:'movie', sub:'Кино', title:'Зэрлэг Зам', desc:'Говийн замд адал явдалд орсон жолоочийн түүх.', badge:'1ц 42м', dur:6120, hue:15 },
+    { id:9, cat:'movie', sub:'Кино', title:'Мөнхийн Зам', desc:'Хайр, хүлээлт, буцаж ирэлтийн тухай уран сайхны кино.', badge:'1ц 55м', dur:6900, hue:200 },
+    { id:10, cat:'movie', sub:'Кино', title:'Гэрэл Далай', desc:'Далайчны гэр бүлийн гурван үеийн түүх.', badge:'2ц 05м', dur:7500, hue:195 },
+    { id:11, cat:'movie', sub:'Кино', title:'Сүүлчийн Ан', desc:'Уулын араас гарч ирсэн нууцлаг араатны тухай триллер.', badge:'1ц 48м', dur:6480, hue:100 },
+    { id:12, cat:'series', sub:'Цуврал', title:'Алтан Гүүр', desc:'Хоёр гэр бүлийн хоорондох залгамжлалын тэмцэл.', badge:'12-р анги', dur:2600, hue:45 },
+    { id:13, cat:'series', sub:'Цуврал', title:'Нууц Хаяг', desc:'Мөрдөгчийн ул мөрөөр өрнөх дуулиантай цуврал.', badge:'8-р анги', dur:2500, hue:8 },
+    { id:14, cat:'series', sub:'Цуврал', title:'Хотын Сүүдэр', desc:'Хотын харанхуй захад амьдрах өсвөр насныхны түүх.', badge:'15-р анги', dur:2400, hue:250 },
+    { id:15, cat:'series', sub:'Цуврал', title:'Гэрийн Тэнгэр', desc:'Нэгэн гэр бүлийн дулаан, инээд гунигтай өдөр тутам.', badge:'6-р анги', dur:2300, hue:130 },
+    { id:16, cat:'show', sub:'Нэвтрүүлэг', title:'Гал Тогооны Дуэль', desc:'Тогооч нарын өрсөлдөөнт нэвтрүүлэг.', badge:'20-р анги', dur:2700, hue:25 },
+    { id:17, cat:'show', sub:'Нэвтрүүлэг', title:'Аяллын Тэмдэглэл', desc:'Монголын алслагдсан булан бүрийг таниулах аяллын нэвтрүүлэг.', badge:'9-р анги', dur:1800, hue:170 },
+    { id:18, cat:'show', sub:'Нэвтрүүлэг', title:'Шинжлэх Ухааны Цаг', desc:'Өдөр тутмын шинжлэх ухааны сонирхолтой баримт.', badge:'14-р анги', dur:1500, hue:210 }
+  ];
+
+  function allVideos(){ return uploadedVideos.concat(VIDEOS); }
+
+  const FAV_KEY = 'tosoolol_favs';
+  const STATUS_KEY = 'tosoolol_status';
+  function getFavs(){ try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch(e){ return []; } }
+  function setFavs(arr){ try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch(e){} }
+  function toggleFav(id){ let f = getFavs(); if (f.includes(id)) f = f.filter(x => x !== id); else f.push(id); setFavs(f); return f.includes(id); }
+  function getStatuses(){ try { return JSON.parse(localStorage.getItem(STATUS_KEY) || '{}'); } catch(e){ return {}; } }
+  function setStatus(id, status){ const s = getStatuses(); if (s[id] === status) delete s[id]; else s[id] = status; try { localStorage.setItem(STATUS_KEY, JSON.stringify(s)); } catch(e){} return s[id]; }
+  const STATUS_LABELS = { notify:'Мэдэгдэл авах', later:'Дараа үзэх', done:'Үзэж дууссан', watching:'Үзэж байгаа', unwatched:'Үзээгүй цуврал' };
+  function fmtTime(s){ const m = Math.floor(s/60), r = Math.floor(s%60); return m + ':' + String(r).padStart(2,'0'); }
+
+  function artSVG(v, big){
+    const h = v.hue, h2 = (h+40)%360;
+    const numericId = typeof v.id === 'number' ? v.id : (String(v.id).match(/\d+/) || [7])[0]*1;
+    const seed = (numericId || 7) * 37;
+    const n = big ? 4 : 3, shapes = [];
+    for (let i=0;i<n;i++){
+      const cx = 15 + ((seed*(i+2))%70), cy = 15 + ((seed*(i+5))%70), r = 16 + ((seed*(i+3))%24);
+      shapes.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="hsla(${(h+i*25)%360},55%,${big?45:40}%,0.35)"/>`);
+    }
+    const vh = big ? 56 : 150;
+    return `<svg viewBox="0 0 100 ${vh}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <defs><linearGradient id="g${v.id}${big?'b':''}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="hsl(${h},48%,${big?20:16}%)"/>
+        <stop offset="100%" stop-color="hsl(${h2},55%,${big?12:9}%)"/>
+      </linearGradient></defs>
+      <rect width="100" height="${vh}" fill="url(#g${v.id}${big?'b':''})"/>
+      ${shapes.join('')}
+    </svg>`;
+  }
+
+  // ---------- Sidebar nav ----------
+  const mainNav = document.getElementById('mainNav');
+  let activeCat = 'all';
+  CATS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'nav-item' + (c.id === 'all' ? ' active' : '');
+    b.dataset.cat = c.id;
+    b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${c.icon}</svg>${c.label}`;
+    b.onclick = () => { activeCat = c.id; [...mainNav.children].forEach(x => x.classList.toggle('active', x === b)); render(); if (window.innerWidth <= 880) sidebar.classList.remove('open'); };
+    mainNav.appendChild(b);
+  });
+  const sidebar = document.getElementById('sidebar');
+  document.getElementById('menuBtn').onclick = () => sidebar.classList.toggle('open');
+
+  // ---------- Hero ----------
+  const heroVid = VIDEOS[4];
+  document.getElementById('heroCanvas').innerHTML = artSVG(heroVid, true);
+  document.getElementById('heroTitle').textContent = heroVid.title;
+  document.getElementById('heroDesc').textContent = heroVid.desc;
+  document.getElementById('heroPlay').onclick = () => openPlayer(heroVid.id);
+  document.getElementById('heroInfo').onclick = () => openPlayer(heroVid.id);
+
+  // ---------- Search ----------
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('input', render);
+
+  // ---------- Render rows ----------
+  const rowsEl = document.getElementById('rows');
+  const ROW_DEFS = [
+    { key:'uploaded', label:'Таны байршуулсан видео', filter: v => v.isUploaded },
+    { key:'new', label:'Шинээр нэмэгдсэн', filter: v => true },
+    { key:'ai', label:'AI-гаар бүтээсэн', filter: v => v.cat === 'ai' },
+    { key:'movie', label:'Кино', filter: v => v.cat === 'movie' },
+    { key:'series', label:'Цуврал', filter: v => v.cat === 'series' },
+    { key:'show', label:'Нэвтрүүлэг', filter: v => v.cat === 'show' }
+  ];
+
+  function render(){
+    const q = searchInput.value.trim().toLowerCase();
+    rowsEl.innerHTML = '';
+    const favs = getFavs();
+    let defs;
+    if (activeCat === 'fav') defs = [{ key:'fav', label:'Таалагдсан', filter: v => favs.includes(v.id) }];
+    else if (activeCat === 'later' || activeCat === 'history') defs = [{ key:activeCat, label: activeCat==='later' ? 'Дараа үзэх' : 'Үзсэн түүх', filter: () => false }];
+    else if (activeCat === 'all') defs = ROW_DEFS;
+    else defs = [{ key:activeCat, label: CATS.find(c=>c.id===activeCat).label, filter: v => v.cat === activeCat }];
+
+    let shown = 0;
+    defs.forEach(def => {
+      let vids = allVideos().filter(def.filter);
+      if (q) vids = vids.filter(v => v.title.toLowerCase().includes(q) || v.desc.toLowerCase().includes(q));
+      if (!vids.length) return;
+      shown += vids.length;
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<div class="row-head"><h3>${def.label}</h3><span>${vids.length}</span></div><div class="grid-row"></div>`;
+      const grid = row.querySelector('.grid-row');
+      vids.forEach(v => {
+        const isFav = favs.includes(v.id);
+        const p = document.createElement('div');
+        p.className = 'poster';
+        const badgeColor = { ai:'var(--c-ai)', movie:'var(--c-movie)', series:'var(--c-series)', show:'var(--c-show)' }[v.cat] || 'var(--gold)';
+        p.innerHTML = `
+          ${artSVG(v)}
+          <div class="poster-scrim"></div>
+          <span class="poster-badge" style="background:${badgeColor}">${v.badge}</span>
+          <button class="poster-fav" data-fav="${isFav?1:0}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="${isFav?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C.5 8 2 4 6 4c2 0 3.5 1.2 4 2.2C10.5 5.2 12 4 14 4c4 0 5.5 4 3.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
+          </button>
+          <div class="poster-title">${v.title}</div>`;
+        p.addEventListener('click', (e) => { if (e.target.closest('.poster-fav')) return; openPlayer(v.id); });
+        p.querySelector('.poster-fav').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const btn = e.currentTarget;
+          const on = toggleFav(v.id);
+          btn.dataset.fav = on ? 1 : 0;
+          btn.querySelector('svg').setAttribute('fill', on ? 'currentColor' : 'none');
+        });
+        grid.appendChild(p);
+      });
+      rowsEl.appendChild(row);
+    });
+    if (!shown) rowsEl.innerHTML = '<p class="empty-msg">Энд одоогоор контент алга байна.</p>';
+  }
+  render();
+  loadUploadedVideos().then(render);
+
+  // ---------- Player modal ----------
+  const backdrop = document.getElementById('modalBackdrop');
+  const playerArt = document.getElementById('playerArt');
+  const playerToggle = document.getElementById('playerToggle');
+  const playRing = document.getElementById('playRing');
+  const ctrlPlay = document.getElementById('ctrlPlay');
+  const progressTrack = document.getElementById('progressTrack');
+  const progressFill = document.getElementById('progressFill');
+  const timeLabel = document.getElementById('timeLabel');
+  const listBtn = document.getElementById('listBtn');
+  const listBtnLabel = document.getElementById('listBtnLabel');
+  const listMenu = document.getElementById('listMenu');
+  let curVideo = null, playing = false, elapsed = 0, timer = null;
+
+  function refreshListMenu(){
+    const statuses = getStatuses();
+    const cur = curVideo ? statuses[curVideo.id] : null;
+    listBtnLabel.textContent = cur ? STATUS_LABELS[cur] : 'Жагсаалтад нэмэх';
+    [...listMenu.children].forEach(btn => btn.classList.toggle('selected', btn.dataset.status === cur));
+  }
+  listMenu.querySelectorAll('.list-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setStatus(curVideo.id, btn.dataset.status);
+      refreshListMenu();
+      listMenu.classList.remove('open');
+    });
+  });
+  listBtn.addEventListener('click', (e) => { e.stopPropagation(); listMenu.classList.toggle('open'); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.list-wrap')) listMenu.classList.remove('open'); });
+
+  function iconPlay(){ return '<svg width="26" height="26" viewBox="0 0 24 24" fill="#F2ECE0"><path d="M7 4l14 8-14 8z"/></svg>'; }
+  function iconPause(){ return '<svg width="26" height="26" viewBox="0 0 24 24" fill="#F2ECE0"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; }
+  function smallIcon(p){ return p ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg>'; }
+
+  function openPlayer(id){
+    curVideo = allVideos().find(v => v.id === id);
+    document.getElementById('modalTitle').textContent = curVideo.title;
+    document.getElementById('modalDesc').textContent = curVideo.desc;
+    refreshListMenu();
+    backdrop.classList.add('open');
+
+    if (curVideo.isUploaded && curVideo.videoUrl){
+      playerToggle.style.display = 'none';
+      document.querySelector('.player-bar').style.display = 'none';
+      playerArt.innerHTML = `<video src="${curVideo.videoUrl}" controls autoplay style="width:100%;height:100%;background:#000;" playsinline></video>`;
+    } else {
+      playerToggle.style.display = 'flex';
+      document.querySelector('.player-bar').style.display = 'block';
+      playerArt.innerHTML = artSVG(curVideo, true);
+      elapsed = 0; playing = false;
+      updatePlayUI();
+      setPlaying(true);
+    }
+  }
+  function closePlayer(){ backdrop.classList.remove('open'); listMenu.classList.remove('open'); setPlaying(false); clearInterval(timer); playerArt.innerHTML = ''; }
+  function setPlaying(p){
+    playing = p; updatePlayUI(); clearInterval(timer);
+    if (playing) timer = setInterval(() => {
+      elapsed += 1;
+      if (elapsed >= curVideo.dur){ elapsed = curVideo.dur; setPlaying(false); }
+      updateProgress();
+    }, 1000);
+  }
+  function updatePlayUI(){ playRing.innerHTML = playing ? iconPause() : iconPlay(); ctrlPlay.innerHTML = smallIcon(playing); updateProgress(); }
+  function updateProgress(){
+    const pct = curVideo ? (elapsed / curVideo.dur) * 100 : 0;
+    progressFill.style.width = pct + '%';
+    timeLabel.textContent = fmtTime(elapsed) + ' / ' + fmtTime(curVideo ? curVideo.dur : 0);
+  }
+  playerToggle.addEventListener('click', () => setPlaying(!playing));
+  ctrlPlay.addEventListener('click', () => setPlaying(!playing));
+  progressTrack.addEventListener('click', (e) => {
+    const rect = progressTrack.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    elapsed = Math.max(0, Math.min(curVideo.dur, Math.round(pct * curVideo.dur)));
+    updateProgress();
+  });
+  document.getElementById('modalClose').addEventListener('click', closePlayer);
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closePlayer(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePlayer(); });
+
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  // ---------- Profile menu ----------
+  const avatarBtn = document.getElementById('avatarBtn');
+  const profileMenu = document.getElementById('profileMenu');
+  avatarBtn.addEventListener('click', (e) => { e.stopPropagation(); profileMenu.classList.toggle('open'); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.avatar-wrap')) profileMenu.classList.remove('open'); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') profileMenu.classList.remove('open'); });
+})();
+</script>
+</body>
+</html>
