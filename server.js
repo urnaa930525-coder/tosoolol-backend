@@ -5,9 +5,83 @@ const path = require('path');
 const fs = require('fs');
 const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ---------- Database ----------
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false }
+});
+
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      phone TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS videos (
+      id BIGINT PRIMARY KEY,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      badge TEXT DEFAULT '',
+      filename TEXT NOT NULL,
+      url TEXT NOT NULL,
+      thumbnail_url TEXT,
+      subtitle_url TEXT,
+      subtitle_lang TEXT,
+      size BIGINT,
+      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS subscribers (
+      user_id TEXT PRIMARY KEY,
+      expires_at TIMESTAMPTZ NOT NULL,
+      last_paid_at TIMESTAMPTZ NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS payments (
+      invoice_no TEXT PRIMARY KEY,
+      invoice_id TEXT,
+      amount NUMERIC,
+      description TEXT,
+      user_id TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      paid_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS manual_requests (
+      id BIGINT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      amount NUMERIC,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      approved_at TIMESTAMPTZ
+    );
+  `);
+  console.log('DB ready.');
+}
+
+function videoRowToJson(r) {
+  return {
+    id: Number(r.id),
+    title: r.title,
+    category: r.category,
+    description: r.description || '',
+    badge: r.badge || '',
+    filename: r.filename,
+    url: r.url,
+    thumbnailUrl: r.thumbnail_url,
+    subtitleUrl: r.subtitle_url,
+    subtitleLang: r.subtitle_lang,
+    size: r.size !== null ? Number(r.size) : null,
+    uploadedAt: r.uploaded_at
+  };
+}
 
 // ---------- Admin phone numbers ----------
 // Set ADMIN_PHONES as a comma-separated list of phone numbers in Render's
@@ -23,18 +97,7 @@ function isAdminPhone(phone) {
 }
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
-const DATA_FILE = path.join(__dirname, 'videos.json');
-const PAYMENTS_FILE = path.join(__dirname, 'payments.json');
-const SUBSCRIBERS_FILE = path.join(__dirname, 'subscribers.json');
-const USERS_FILE = path.join(__dirname, 'users.json');
-const MANUAL_REQUESTS_FILE = path.join(__dirname, 'manual_requests.json');
-
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, '[]');
-if (!fs.existsSync(PAYMENTS_FILE)) fs.writeFileSync(PAYMENTS_FILE, '{}');
-if (!fs.existsSync(SUBSCRIBERS_FILE)) fs.writeFileSync(SUBSCRIBERS_FILE, '{}');
-if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '{}');
-if (!fs.existsSync(MANUAL_REQUESTS_FILE)) fs.writeFileSync(MANUAL_REQUESTS_FILE, '[]');
 
 const BANK_TRANSFER_INFO = {
   bank: 'Хаан Банк',
@@ -94,50 +157,16 @@ function generateThumbnail(videoPath, thumbPath) {
   });
 }
 
-function readVideos() {
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8')); } catch (e) { return []; }
-}
-function writeVideos(list) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(list, null, 2));
-}
-
-function readPayments() {
-  try { return JSON.parse(fs.readFileSync(PAYMENTS_FILE, 'utf-8')); } catch (e) { return {}; }
-}
-function writePayments(obj) {
-  fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(obj, null, 2));
-}
-
-function readSubscribers() {
-  try { return JSON.parse(fs.readFileSync(SUBSCRIBERS_FILE, 'utf-8')); } catch (e) { return {}; }
-}
-function writeSubscribers(obj) {
-  fs.writeFileSync(SUBSCRIBERS_FILE, JSON.stringify(obj, null, 2));
-}
-
-function readUsers() {
-  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8')); } catch (e) { return {}; }
-}
-function writeUsers(obj) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(obj, null, 2));
-}
-
-function readManualRequests() {
-  try { return JSON.parse(fs.readFileSync(MANUAL_REQUESTS_FILE, 'utf-8')); } catch (e) { return []; }
-}
-function writeManualRequests(list) {
-  fs.writeFileSync(MANUAL_REQUESTS_FILE, JSON.stringify(list, null, 2));
-}
-
-function activateSubscription(userId) {
-  const subscribers = readSubscribers();
+async function activateSubscription(userId) {
   const now = new Date();
-  const current = subscribers[userId] && new Date(subscribers[userId].expiresAt) > now
-    ? new Date(subscribers[userId].expiresAt)
-    : now;
+  const { rows } = await pool.query('SELECT expires_at FROM subscribers WHERE user_id = $1', [userId]);
+  const current = rows[0] && new Date(rows[0].expires_at) > now ? new Date(rows[0].expires_at) : now;
   current.setDate(current.getDate() + SUBSCRIPTION_DAYS);
-  subscribers[userId] = { expiresAt: current.toISOString(), lastPaidAt: now.toISOString() };
-  writeSubscribers(subscribers);
+  await pool.query(
+    `INSERT INTO subscribers (user_id, expires_at, last_paid_at) VALUES ($1, $2, $3)
+     ON CONFLICT (user_id) DO UPDATE SET expires_at = $2, last_paid_at = $3`,
+    [userId, current.toISOString(), now.toISOString()]
+  );
 }
 
 // ---------- QPay integration ----------
@@ -196,16 +225,11 @@ app.post('/api/qpay/create-invoice', async (req, res) => {
     const invoiceNo = senderInvoiceNo || ('INV-' + Date.now());
     const data = await createQpayInvoice({ invoiceNo, amount, description, req });
 
-    const payments = readPayments();
-    payments[invoiceNo] = {
-      invoice_id: data.invoice_id,
-      sender_invoice_no: invoiceNo,
-      amount,
-      description,
-      status: 'PENDING',
-      createdAt: new Date().toISOString()
-    };
-    writePayments(payments);
+    await pool.query(
+      `INSERT INTO payments (invoice_no, invoice_id, amount, description, status)
+       VALUES ($1, $2, $3, $4, 'PENDING')`,
+      [invoiceNo, data.invoice_id, amount, description]
+    );
 
     res.status(201).json({
       invoice_id: data.invoice_id,
@@ -219,26 +243,27 @@ app.post('/api/qpay/create-invoice', async (req, res) => {
   }
 });
 
-app.post('/api/qpay/callback', (req, res) => {
+app.post('/api/qpay/callback', async (req, res) => {
   const invoiceNo = req.query.invoice_no;
-  const payments = readPayments();
-  if (invoiceNo && payments[invoiceNo]) {
-    payments[invoiceNo].status = 'PAID';
-    payments[invoiceNo].paidAt = new Date().toISOString();
-    writePayments(payments);
-
-    if (invoiceNo.startsWith('SUB-') && payments[invoiceNo].userId) {
-      activateSubscription(payments[invoiceNo].userId);
+  if (invoiceNo) {
+    const { rows } = await pool.query('SELECT * FROM payments WHERE invoice_no = $1', [invoiceNo]);
+    if (rows[0]) {
+      await pool.query(
+        `UPDATE payments SET status = 'PAID', paid_at = now() WHERE invoice_no = $1`,
+        [invoiceNo]
+      );
+      if (invoiceNo.startsWith('SUB-') && rows[0].user_id) {
+        await activateSubscription(rows[0].user_id);
+      }
     }
   }
   res.status(200).json({ ok: true });
 });
 
-app.get('/api/qpay/status/:senderInvoiceNo', (req, res) => {
-  const payments = readPayments();
-  const record = payments[req.params.senderInvoiceNo];
-  if (!record) return res.status(404).json({ error: 'Олдсонгүй.' });
-  res.json({ status: record.status });
+app.get('/api/qpay/status/:senderInvoiceNo', async (req, res) => {
+  const { rows } = await pool.query('SELECT status FROM payments WHERE invoice_no = $1', [req.params.senderInvoiceNo]);
+  if (!rows[0]) return res.status(404).json({ error: 'Олдсонгүй.' });
+  res.json({ status: rows[0].status });
 });
 
 app.post('/api/subscribe/create-invoice', async (req, res) => {
@@ -254,17 +279,11 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
       req
     });
 
-    const payments = readPayments();
-    payments[invoiceNo] = {
-      invoice_id: data.invoice_id,
-      sender_invoice_no: invoiceNo,
-      amount: SUBSCRIPTION_PRICE,
-      description: 'Гишүүнчлэл - 1 сар',
-      userId,
-      status: 'PENDING',
-      createdAt: new Date().toISOString()
-    };
-    writePayments(payments);
+    await pool.query(
+      `INSERT INTO payments (invoice_no, invoice_id, amount, description, user_id, status)
+       VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
+      [invoiceNo, data.invoice_id, SUBSCRIPTION_PRICE, 'Гишүүнчлэл - 1 сар', userId]
+    );
 
     res.status(201).json({
       invoice_id: data.invoice_id,
@@ -278,94 +297,94 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
   }
 });
 
-app.get('/api/subscribe/status/:userId', (req, res) => {
+app.get('/api/subscribe/status/:userId', async (req, res) => {
   if (isAdminPhone(req.params.userId)) {
     return res.json({ active: true, isAdmin: true, expiresAt: null, price: SUBSCRIPTION_PRICE });
   }
-  const subscribers = readSubscribers();
-  const record = subscribers[req.params.userId];
-  const active = !!record && new Date(record.expiresAt) > new Date();
-  res.json({ active, expiresAt: record ? record.expiresAt : null, price: SUBSCRIPTION_PRICE });
+  const { rows } = await pool.query('SELECT expires_at FROM subscribers WHERE user_id = $1', [req.params.userId]);
+  const record = rows[0];
+  const active = !!record && new Date(record.expires_at) > new Date();
+  res.json({ active, expiresAt: record ? record.expires_at : null, price: SUBSCRIPTION_PRICE });
 });
 
 app.get('/api/subscribe/bank-info', (req, res) => {
   res.json({ ...BANK_TRANSFER_INFO, price: SUBSCRIPTION_PRICE });
 });
 
-app.post('/api/subscribe/manual-request', (req, res) => {
+app.post('/api/subscribe/manual-request', async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
-  const requests = readManualRequests();
-  const reqRecord = {
-    id: Date.now(),
-    userId,
-    amount: SUBSCRIPTION_PRICE,
-    status: 'pending',
-    createdAt: new Date().toISOString()
-  };
-  requests.push(reqRecord);
-  writeManualRequests(requests);
-  res.status(201).json(reqRecord);
+  const id = Date.now();
+  await pool.query(
+    `INSERT INTO manual_requests (id, user_id, amount, status) VALUES ($1, $2, $3, 'pending')`,
+    [id, userId, SUBSCRIPTION_PRICE]
+  );
+  res.status(201).json({ id, userId, amount: SUBSCRIPTION_PRICE, status: 'pending' });
 });
 
-app.get('/api/admin/manual-requests', (req, res) => {
-  res.json(readManualRequests());
+app.get('/api/admin/manual-requests', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM manual_requests ORDER BY created_at ASC');
+  res.json(rows.map(r => ({
+    id: Number(r.id),
+    userId: r.user_id,
+    amount: Number(r.amount),
+    status: r.status,
+    createdAt: r.created_at,
+    approvedAt: r.approved_at
+  })));
 });
 
-app.post('/api/admin/manual-requests/:id/approve', (req, res) => {
-  const requests = readManualRequests();
-  const record = requests.find(r => String(r.id) === req.params.id);
+app.post('/api/admin/manual-requests/:id/approve', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM manual_requests WHERE id = $1', [req.params.id]);
+  const record = rows[0];
   if (!record) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
   if (record.status === 'approved') return res.status(400).json({ error: 'Аль хэдийн баталгаажсан.' });
-  record.status = 'approved';
-  record.approvedAt = new Date().toISOString();
-  writeManualRequests(requests);
-  activateSubscription(record.userId);
+  await pool.query(`UPDATE manual_requests SET status = 'approved', approved_at = now() WHERE id = $1`, [req.params.id]);
+  await activateSubscription(record.user_id);
   res.json({ ok: true });
 });
 
-app.post('/api/admin/manual-requests/:id/reject', (req, res) => {
-  const requests = readManualRequests();
-  const record = requests.find(r => String(r.id) === req.params.id);
-  if (!record) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
-  record.status = 'rejected';
-  writeManualRequests(requests);
+app.post('/api/admin/manual-requests/:id/reject', async (req, res) => {
+  const { rowCount } = await pool.query(`UPDATE manual_requests SET status = 'rejected' WHERE id = $1`, [req.params.id]);
+  if (!rowCount) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
   res.json({ ok: true });
 });
 
-// ---------- Routes ----------
 // ---------- Simple phone-based auth (no SMS verification) ----------
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   const { name } = req.body;
   if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
   if (!name || !name.trim()) return res.status(400).json({ error: 'Нэрээ оруулна уу.' });
 
-  const users = readUsers();
-  if (users[phone]) return res.status(409).json({ error: 'Энэ дугаар аль хэдийн бүртгэлтэй байна. Нэвтэрнэ үү.' });
+  const existing = await pool.query('SELECT phone FROM users WHERE phone = $1', [phone]);
+  if (existing.rows[0]) return res.status(409).json({ error: 'Энэ дугаар аль хэдийн бүртгэлтэй байна. Нэвтэрнэ үү.' });
 
-  users[phone] = { phone, name: name.trim(), createdAt: new Date().toISOString() };
-  writeUsers(users);
-  res.status(201).json({ ...users[phone], isAdmin: isAdminPhone(phone) });
+  const { rows } = await pool.query(
+    'INSERT INTO users (phone, name) VALUES ($1, $2) RETURNING phone, name, created_at',
+    [phone, name.trim()]
+  );
+  res.status(201).json({ phone: rows[0].phone, name: rows[0].name, createdAt: rows[0].created_at, isAdmin: isAdminPhone(phone) });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
 
-  const users = readUsers();
-  if (!users[phone]) return res.status(404).json({ error: 'Энэ дугаар бүртгэлгүй байна. Эхлээд бүртгүүлнэ үү.' });
-  res.json({ ...users[phone], isAdmin: isAdminPhone(phone) });
+  const { rows } = await pool.query('SELECT phone, name, created_at FROM users WHERE phone = $1', [phone]);
+  if (!rows[0]) return res.status(404).json({ error: 'Энэ дугаар бүртгэлгүй байна. Эхлээд бүртгүүлнэ үү.' });
+  res.json({ phone: rows[0].phone, name: rows[0].name, createdAt: rows[0].created_at, isAdmin: isAdminPhone(phone) });
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-app.get('/api/videos', (req, res) => {
-  res.json(readVideos());
+app.get('/api/videos', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
+  res.json(rows.map(videoRowToJson));
 });
 
 app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
@@ -416,62 +435,57 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
     }
   }
 
-  const videos = readVideos();
-  const newVideo = {
-    id: Date.now(),
-    title,
-    category,
-    description: description || '',
-    badge: badge || '',
-    filename: videoFile.filename,
-    url: `/uploads/${videoFile.filename}`,
-    thumbnailUrl,
-    subtitleUrl,
-    subtitleLang: subtitleUrl ? (subtitleLang || 'mn') : null,
-    size: videoFile.size,
-    uploadedAt: new Date().toISOString()
-  };
-  videos.push(newVideo);
-  writeVideos(videos);
-  res.status(201).json(newVideo);
+  const id = Date.now();
+  const { rows } = await pool.query(
+    `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    [
+      id, title, category, description || '', badge || '',
+      videoFile.filename, `/uploads/${videoFile.filename}`,
+      thumbnailUrl, subtitleUrl, subtitleUrl ? (subtitleLang || 'mn') : null,
+      videoFile.size
+    ]
+  );
+  res.status(201).json(videoRowToJson(rows[0]));
 });
 
-app.post('/api/videos/:id/thumbnail', upload.single('thumbnail'), (req, res) => {
+app.post('/api/videos/:id/thumbnail', upload.single('thumbnail'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'Thumbnail зураг олдсонгүй.' });
 
-  const videos = readVideos();
-  const video = videos.find(v => String(v.id) === req.params.id);
+  const { rows } = await pool.query('SELECT * FROM videos WHERE id = $1', [req.params.id]);
+  const video = rows[0];
   if (!video) {
     fs.unlinkSync(file.path);
     return res.status(404).json({ error: 'Видео олдсонгүй.' });
   }
 
-  if (video.thumbnailUrl) {
-    const oldPath = path.join(UPLOAD_DIR, path.basename(video.thumbnailUrl));
+  if (video.thumbnail_url) {
+    const oldPath = path.join(UPLOAD_DIR, path.basename(video.thumbnail_url));
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
   }
-  video.thumbnailUrl = `/uploads/${file.filename}`;
-  writeVideos(videos);
-  res.json(video);
+  const thumbnailUrl = `/uploads/${file.filename}`;
+  const { rows: updated } = await pool.query(
+    'UPDATE videos SET thumbnail_url = $1 WHERE id = $2 RETURNING *',
+    [thumbnailUrl, req.params.id]
+  );
+  res.json(videoRowToJson(updated[0]));
 });
 
-app.delete('/api/videos/:id', (req, res) => {
-  const videos = readVideos();
-  const idx = videos.findIndex(v => String(v.id) === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Видео олдсонгүй.' });
-  const [removed] = videos.splice(idx, 1);
+app.delete('/api/videos/:id', async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM videos WHERE id = $1 RETURNING *', [req.params.id]);
+  const removed = rows[0];
+  if (!removed) return res.status(404).json({ error: 'Видео олдсонгүй.' });
   const filePath = path.join(UPLOAD_DIR, removed.filename);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  if (removed.subtitleUrl) {
-    const subPath = path.join(UPLOAD_DIR, path.basename(removed.subtitleUrl));
+  if (removed.subtitle_url) {
+    const subPath = path.join(UPLOAD_DIR, path.basename(removed.subtitle_url));
     if (fs.existsSync(subPath)) fs.unlinkSync(subPath);
   }
-  if (removed.thumbnailUrl) {
-    const thumbPath = path.join(UPLOAD_DIR, path.basename(removed.thumbnailUrl));
+  if (removed.thumbnail_url) {
+    const thumbPath = path.join(UPLOAD_DIR, path.basename(removed.thumbnail_url));
     if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
   }
-  writeVideos(videos);
   res.json({ ok: true });
 });
 
@@ -480,6 +494,13 @@ app.use((err, req, res, next) => {
   res.status(400).json({ error: err.message || 'Алдаа гарлаа.' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Tosoolol backend listening on port ${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Tosoolol backend listening on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('DB init failed:', err);
+    process.exit(1);
+  });
