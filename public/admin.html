@@ -81,8 +81,29 @@ async function loadVideos() {
   const res = await fetch('/api/videos');
   const videos = await res.json();
   listEl.innerHTML = '<h3>Байршуулсан видеонууд (' + videos.length + ')</h3>' +
-    videos.map(v => `<div class="vid"><span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span><button onclick="delVideo(${v.id})">Устгах</button></div>`).join('');
+    videos.map(v => `
+      <div class="vid-block">
+        <div class="vid">
+          <span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span>
+          <span>
+            <button onclick="togglePreview(${v.id})" style="background:#4B3F92;">Урьдчилан үзэх</button>
+            <button onclick="delVideo(${v.id})">Устгах</button>
+          </span>
+        </div>
+        <div id="preview-${v.id}" style="display:none; margin:8px 0 16px;"></div>
+      </div>`).join('');
+  window._videos = videos;
 }
+
+function togglePreview(id) {
+  const box = document.getElementById('preview-' + id);
+  if (box.style.display === 'block') { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const v = window._videos.find(x => x.id === id);
+  const track = v.subtitleUrl ? `<track kind="subtitles" src="${v.subtitleUrl}" srclang="${v.subtitleLang||'mn'}" label="${v.subtitleLang==='en'?'English':'Монгол'}" default>` : '';
+  box.innerHTML = `<video src="${v.url}" controls style="max-width:100%; max-height:400px; background:#000;">${track}</video>`;
+  box.style.display = 'block';
+}
+window.togglePreview = togglePreview;
 
 async function delVideo(id) {
   await fetch('/api/videos/' + id, { method: 'DELETE' });
