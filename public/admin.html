@@ -11,7 +11,9 @@
   button { margin-top: 20px; padding: 10px 20px; background: #E3A24B; color: #1a130a; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
   #result { margin-top: 20px; padding: 12px; border-radius: 8px; background: #1a2a26; font-size: 0.85rem; white-space: pre-wrap; }
   #list { margin-top: 30px; }
-  .vid { padding: 10px; background: #17242a; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+  .vid { padding: 10px; background: #17242a; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .vid-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .vid-thumb { width: 56px; height: 84px; object-fit: cover; border-radius: 4px; background: #0c1416; flex-shrink: 0; }
   .vid button { margin: 0; padding: 4px 10px; background: #C9604C; font-size: 0.75rem; }
   video::cue {
     font-size: clamp(12px, 1.2vw, 18px);
@@ -38,6 +40,8 @@
     <input type="text" name="badge">
     <label>Видео файл (mp4, webm, mov, mkv)</label>
     <input type="file" name="video" accept="video/*" required>
+    <label>Thumbnail зураг (jpg/png/webp) — заавал биш, өгөхгүй бол видеоноос автоматаар авна</label>
+    <input type="file" name="thumbnail" accept="image/jpeg,image/png,image/webp">
     <label>Хадмал файл (.srt эсвэл .vtt) — заавал биш</label>
     <input type="file" name="subtitle" accept=".srt,.vtt">
     <label>Хадмалын хэл</label>
@@ -89,9 +93,13 @@ async function loadVideos() {
     videos.map(v => `
       <div class="vid-block">
         <div class="vid">
-          <span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span>
+          <span class="vid-info">
+            ${v.thumbnailUrl ? `<img class="vid-thumb" src="${v.thumbnailUrl}" alt="">` : ''}
+            <span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span>
+          </span>
           <span>
             <button onclick="togglePreview(${v.id})" style="background:#4B3F92;">Урьдчилан үзэх</button>
+            <button onclick="pickThumbnail(${v.id})" style="background:#2E7D6B;">Thumbnail солих</button>
             <button onclick="delVideo(${v.id})">Устгах</button>
           </span>
         </div>
@@ -107,6 +115,7 @@ function togglePreview(id) {
 
   const video = document.createElement('video');
   video.src = v.url;
+  if (v.thumbnailUrl) video.poster = v.thumbnailUrl;
   video.controls = true;
   video.style.maxWidth = '100%';
   video.style.maxHeight = '400px';
@@ -130,6 +139,29 @@ function togglePreview(id) {
   box.style.display = 'block';
 }
 window.togglePreview = togglePreview;
+
+function pickThumbnail(id) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp';
+  input.onchange = async () => {
+    if (!input.files[0]) return;
+    const fd = new FormData();
+    fd.append('thumbnail', input.files[0]);
+    result.textContent = 'Thumbnail шинэчилж байна...';
+    try {
+      const res = await fetch(`/api/videos/${id}/thumbnail`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Алдаа');
+      result.textContent = 'Thumbnail шинэчлэгдлээ.';
+      loadVideos();
+    } catch (err) {
+      result.textContent = 'Алдаа: ' + err.message;
+    }
+  };
+  input.click();
+}
+window.pickThumbnail = pickThumbnail;
 
 async function delVideo(id) {
   await fetch('/api/videos/' + id, { method: 'DELETE' });
