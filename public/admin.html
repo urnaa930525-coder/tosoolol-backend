@@ -99,8 +99,29 @@ function togglePreview(id) {
   const box = document.getElementById('preview-' + id);
   if (box.style.display === 'block') { box.style.display = 'none'; box.innerHTML = ''; return; }
   const v = window._videos.find(x => x.id === id);
-  const track = v.subtitleUrl ? `<track kind="subtitles" src="${v.subtitleUrl}" srclang="${v.subtitleLang||'mn'}" label="${v.subtitleLang==='en'?'English':'Монгол'}" default>` : '';
-  box.innerHTML = `<video src="${v.url}" controls style="max-width:100%; max-height:400px; background:#000;">${track}</video>`;
+
+  const video = document.createElement('video');
+  video.src = v.url;
+  video.controls = true;
+  video.style.maxWidth = '100%';
+  video.style.maxHeight = '400px';
+  video.style.background = '#000';
+
+  if (v.subtitleUrl) {
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.src = v.subtitleUrl;
+    track.srclang = v.subtitleLang || 'mn';
+    track.label = v.subtitleLang === 'en' ? 'English' : 'Монгол';
+    track.default = true;
+    video.appendChild(track);
+    video.addEventListener('loadedmetadata', () => {
+      if (video.textTracks && video.textTracks[0]) video.textTracks[0].mode = 'showing';
+    });
+  }
+
+  box.innerHTML = '';
+  box.appendChild(video);
   box.style.display = 'block';
 }
 window.togglePreview = togglePreview;
