@@ -538,6 +538,8 @@
         dur: 0,
         hue: (v.id % 360),
         videoUrl: API_BASE + v.url,
+        subtitleUrl: v.subtitleUrl ? (API_BASE + v.subtitleUrl) : null,
+        subtitleLang: v.subtitleLang || null,
         isUploaded: true
       }));
     } catch (e) {
@@ -733,7 +735,10 @@
       playerStage.classList.add('natural-ratio');
       playerToggle.style.display = 'none';
       document.querySelector('.player-bar').style.display = 'none';
-      playerArt.innerHTML = `<video src="${curVideo.videoUrl}" controls autoplay playsinline></video>`;
+      const trackHtml = curVideo.subtitleUrl
+        ? `<track kind="subtitles" src="${curVideo.subtitleUrl}" srclang="${curVideo.subtitleLang||'mn'}" label="${curVideo.subtitleLang==='en'?'English':'Монгол'}" default>`
+        : '';
+      playerArt.innerHTML = `<video src="${curVideo.videoUrl}" controls autoplay playsinline>${trackHtml}</video>`;
     } else {
       playerStage.classList.remove('natural-ratio');
       playerToggle.style.display = 'flex';
