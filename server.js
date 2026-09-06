@@ -47,6 +47,11 @@ const upload = multer({
   storage,
   limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max per file
   fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'subtitle') {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext === '.srt' || ext === '.vtt') return cb(null, true);
+      return cb(new Error('Хадмал файл .srt эсвэл .vtt байх ёстой.'));
+    }
     const allowed = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'];
     if (allowed.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Дэмжигдэхгүй файл төрөл. mp4, webm, mov, mkv л зөвшөөрнө.'));
@@ -324,13 +329,36 @@ app.get('/api/videos', (req, res) => {
   res.json(readVideos());
 });
 
-app.post('/api/upload', upload.single('video'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Видео файл олдсонгүй.' });
+app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }]), (req, res) => {
+  const videoFile = req.files && req.files.video && req.files.video[0];
+  const subtitleFile = req.files && req.files.subtitle && req.files.subtitle[0];
 
-  const { title, category, description, badge } = req.body;
+  if (!videoFile) return res.status(400).json({ error: 'Видео файл олдсонгүй.' });
+
+  const { title, category, description, badge, subtitleLang } = req.body;
   if (!title || !category) {
-    fs.unlinkSync(req.file.path);
+    fs.unlinkSync(videoFile.path);
+    if (subtitleFile) fs.unlinkSync(subtitleFile.path);
     return res.status(400).json({ error: 'title болон category заавал шаардлагатай.' });
+  }
+
+  let subtitleUrl = null;
+  if (subtitleFile) {
+    const ext = path.extname(subtitleFile.originalname).toLowerCase();
+    const vttFilename = subtitleFile.filename.replace(/\.[^.]+$/, '') + '.vtt';
+    const vttPath = path.join(UPLOAD_DIR, vttFilename);
+    if (ext === '.vtt') {
+      fs.renameSync(subtitleFile.path, vttPath);
+    } else {
+      // Convert SRT -> WebVTT: comma decimals -> dot, add WEBVTT header
+      const srtContent = fs.readFileSync(subtitleFile.path, 'utf-8');
+      const vttContent = 'WEBVTT\n\n' + srtContent
+        .replace(/\r\n/g, '\n')
+        .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+      fs.writeFileSync(vttPath, vttContent, 'utf-8');
+      fs.unlinkSync(subtitleFile.path);
+    }
+    subtitleUrl = `/uploads/${vttFilename}`;
   }
 
   const videos = readVideos();
@@ -340,9 +368,11 @@ app.post('/api/upload', upload.single('video'), (req, res) => {
     category,
     description: description || '',
     badge: badge || '',
-    filename: req.file.filename,
-    url: `/uploads/${req.file.filename}`,
-    size: req.file.size,
+    filename: videoFile.filename,
+    url: `/uploads/${videoFile.filename}`,
+    subtitleUrl,
+    subtitleLang: subtitleUrl ? (subtitleLang || 'mn') : null,
+    size: videoFile.size,
     uploadedAt: new Date().toISOString()
   };
   videos.push(newVideo);
@@ -357,6 +387,10 @@ app.delete('/api/videos/:id', (req, res) => {
   const [removed] = videos.splice(idx, 1);
   const filePath = path.join(UPLOAD_DIR, removed.filename);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  if (removed.subtitleUrl) {
+    const subPath = path.join(UPLOAD_DIR, path.basename(removed.subtitleUrl));
+    if (fs.existsSync(subPath)) fs.unlinkSync(subPath);
+  }
   writeVideos(videos);
   res.json({ ok: true });
 });
