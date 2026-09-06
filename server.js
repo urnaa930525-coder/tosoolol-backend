@@ -355,7 +355,7 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
       const vttContent = 'WEBVTT\n\n' + srtContent
         .replace(/\r\n/g, '\n')
         .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
-        .replace(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})\s*$/gm, '$1 line:78%');
+        .replace(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})\s*$/gm, '$1 line:60%');
       fs.writeFileSync(vttPath, vttContent, 'utf-8');
       fs.unlinkSync(subtitleFile.path);
     }
