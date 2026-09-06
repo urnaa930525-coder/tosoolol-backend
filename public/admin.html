@@ -33,6 +33,13 @@
     <input type="text" name="badge">
     <label>Видео файл (mp4, webm, mov, mkv)</label>
     <input type="file" name="video" accept="video/*" required>
+    <label>Хадмал файл (.srt эсвэл .vtt) — заавал биш</label>
+    <input type="file" name="subtitle" accept=".srt,.vtt">
+    <label>Хадмалын хэл</label>
+    <select name="subtitleLang">
+      <option value="mn">Монгол</option>
+      <option value="en">Англи</option>
+    </select>
     <button type="submit">Upload хийх</button>
   </form>
   <div id="result"></div>
@@ -74,7 +81,7 @@ async function loadVideos() {
   const res = await fetch('/api/videos');
   const videos = await res.json();
   listEl.innerHTML = '<h3>Байршуулсан видеонууд (' + videos.length + ')</h3>' +
-    videos.map(v => `<div class="vid"><span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)</span><button onclick="delVideo(${v.id})">Устгах</button></div>`).join('');
+    videos.map(v => `<div class="vid"><span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span><button onclick="delVideo(${v.id})">Устгах</button></div>`).join('');
 }
 
 async function delVideo(id) {
