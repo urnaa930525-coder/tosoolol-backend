@@ -735,10 +735,28 @@
       playerStage.classList.add('natural-ratio');
       playerToggle.style.display = 'none';
       document.querySelector('.player-bar').style.display = 'none';
-      const trackHtml = curVideo.subtitleUrl
-        ? `<track kind="subtitles" src="${curVideo.subtitleUrl}" srclang="${curVideo.subtitleLang||'mn'}" label="${curVideo.subtitleLang==='en'?'English':'Монгол'}" default>`
-        : '';
-      playerArt.innerHTML = `<video src="${curVideo.videoUrl}" controls autoplay playsinline>${trackHtml}</video>`;
+
+      const video = document.createElement('video');
+      video.src = curVideo.videoUrl;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+
+      if (curVideo.subtitleUrl) {
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.src = curVideo.subtitleUrl;
+        track.srclang = curVideo.subtitleLang || 'mn';
+        track.label = curVideo.subtitleLang === 'en' ? 'English' : 'Монгол';
+        track.default = true;
+        video.appendChild(track);
+        video.addEventListener('loadedmetadata', () => {
+          if (video.textTracks && video.textTracks[0]) video.textTracks[0].mode = 'showing';
+        });
+      }
+
+      playerArt.innerHTML = '';
+      playerArt.appendChild(video);
     } else {
       playerStage.classList.remove('natural-ratio');
       playerToggle.style.display = 'flex';
