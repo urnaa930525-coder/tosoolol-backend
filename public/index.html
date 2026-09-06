@@ -260,6 +260,7 @@
   }
   .poster:hover { transform: translateY(-6px); }
   .poster svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .poster-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(6,6,12,0.95) 100%); }
   .poster-badge {
     position: absolute; left: 9px; top: 9px; color: #0C0C16;
@@ -543,6 +544,7 @@
         dur: 0,
         hue: (v.id % 360),
         videoUrl: API_BASE + v.url,
+        thumbnailUrl: v.thumbnailUrl ? (API_BASE + v.thumbnailUrl) : null,
         subtitleUrl: v.subtitleUrl ? (API_BASE + v.subtitleUrl) : null,
         subtitleLang: v.subtitleLang || null,
         isUploaded: true
@@ -669,7 +671,7 @@
         p.className = 'poster';
         const badgeColor = { ai:'var(--c-ai)', movie:'var(--c-movie)', series:'var(--c-series)', show:'var(--c-show)' }[v.cat] || 'var(--gold)';
         p.innerHTML = `
-          ${artSVG(v)}
+          ${v.thumbnailUrl ? `<img src="${v.thumbnailUrl}" alt="">` : artSVG(v)}
           <div class="poster-scrim"></div>
           <span class="poster-badge" style="background:${badgeColor}">${v.badge}</span>
           <button class="poster-fav" data-fav="${isFav?1:0}">
@@ -729,7 +731,7 @@
 
   function openPlayer(id){
     if (!USER_ID) { showEntryOverlay(); return; }
-    if (!subscriptionActive) { openSubModal(); return; }
+    if (!subscriptionActive && !IS_ADMIN) { openSubModal(); return; }
     curVideo = allVideos().find(v => v.id === id);
     document.getElementById('modalTitle').textContent = curVideo.title;
     document.getElementById('modalDesc').textContent = curVideo.desc;
@@ -743,6 +745,7 @@
 
       const video = document.createElement('video');
       video.src = curVideo.videoUrl;
+      if (curVideo.thumbnailUrl) video.poster = curVideo.thumbnailUrl;
       video.controls = true;
       video.autoplay = true;
       video.playsInline = true;
@@ -818,7 +821,8 @@
   function getStoredUser(){
     const phone = localStorage.getItem('tosoolol_phone');
     const name = localStorage.getItem('tosoolol_name');
-    return phone ? { phone, name } : null;
+    const isAdmin = localStorage.getItem('tosoolol_admin') === '1';
+    return phone ? { phone, name, isAdmin } : null;
   }
   function hideEntryOverlay(){ entryOverlay.style.display = 'none'; }
   function showEntryOverlay(){
@@ -858,7 +862,9 @@
       if (!res.ok) { entryError.textContent = data.error || 'Алдаа гарлаа.'; entrySubmitBtn.disabled = false; return; }
       localStorage.setItem('tosoolol_phone', data.phone);
       localStorage.setItem('tosoolol_name', data.name);
+      localStorage.setItem('tosoolol_admin', data.isAdmin ? '1' : '0');
       USER_ID = data.phone;
+      IS_ADMIN = !!data.isAdmin;
       hideEntryOverlay();
       checkSubscription();
     } catch (err) {
@@ -873,11 +879,13 @@
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('tosoolol_phone');
     localStorage.removeItem('tosoolol_name');
+    localStorage.removeItem('tosoolol_admin');
     location.reload();
   });
 
   // ---------- Subscription ----------
   let USER_ID = storedUser ? storedUser.phone : null;
+  let IS_ADMIN = storedUser ? !!storedUser.isAdmin : false;
   let subscriptionActive = false;
   const subBtn = document.getElementById('subBtn');
   const subModalBackdrop = document.getElementById('subModalBackdrop');
@@ -936,8 +944,8 @@
   });
 
   function updateSubBtn(){
-    subBtn.textContent = subscriptionActive ? 'Гишүүн ✓' : 'Гишүүнчлэл';
-    subBtn.classList.toggle('active', subscriptionActive);
+    subBtn.textContent = IS_ADMIN ? 'Админ ✓' : (subscriptionActive ? 'Гишүүн ✓' : 'Гишүүнчлэл');
+    subBtn.classList.toggle('active', subscriptionActive || IS_ADMIN);
   }
 
   async function checkSubscription(){
