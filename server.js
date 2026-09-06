@@ -3,9 +3,24 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { execFile } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ---------- Admin phone numbers ----------
+// Set ADMIN_PHONES as a comma-separated list of phone numbers in Render's
+// environment variables, e.g. ADMIN_PHONES=99112233,88001122
+const ADMIN_PHONES = new Set(
+  String(process.env.ADMIN_PHONES || '')
+    .split(',')
+    .map(p => p.replace(/\D/g, ''))
+    .filter(Boolean)
+);
+function isAdminPhone(phone) {
+  return ADMIN_PHONES.has(String(phone || '').replace(/\D/g, ''));
+}
 
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const DATA_FILE = path.join(__dirname, 'videos.json');
@@ -52,11 +67,32 @@ const upload = multer({
       if (ext === '.srt' || ext === '.vtt') return cb(null, true);
       return cb(new Error('Хадмал файл .srt эсвэл .vtt байх ёстой.'));
     }
+    if (file.fieldname === 'thumbnail') {
+      const allowedImg = ['image/jpeg', 'image/png', 'image/webp'];
+      if (allowedImg.includes(file.mimetype)) return cb(null, true);
+      return cb(new Error('Thumbnail зураг jpg, png эсвэл webp байх ёстой.'));
+    }
     const allowed = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'];
     if (allowed.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Дэмжигдэхгүй файл төрөл. mp4, webm, mov, mkv л зөвшөөрнө.'));
   }
 });
+
+// ---------- Thumbnail generation ----------
+function generateThumbnail(videoPath, thumbPath) {
+  return new Promise((resolve, reject) => {
+    execFile(ffmpegPath, [
+      '-y',
+      '-ss', '1',
+      '-i', videoPath,
+      '-frames:v', '1',
+      '-vf', 'scale=480:-2',
+      thumbPath
+    ], (err) => {
+      if (err) reject(err); else resolve();
+    });
+  });
+}
 
 function readVideos() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8')); } catch (e) { return []; }
@@ -243,6 +279,9 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
 });
 
 app.get('/api/subscribe/status/:userId', (req, res) => {
+  if (isAdminPhone(req.params.userId)) {
+    return res.json({ active: true, isAdmin: true, expiresAt: null, price: SUBSCRIPTION_PRICE });
+  }
   const subscribers = readSubscribers();
   const record = subscribers[req.params.userId];
   const active = !!record && new Date(record.expiresAt) > new Date();
@@ -311,7 +350,7 @@ app.post('/api/auth/register', (req, res) => {
 
   users[phone] = { phone, name: name.trim(), createdAt: new Date().toISOString() };
   writeUsers(users);
-  res.status(201).json(users[phone]);
+  res.status(201).json({ ...users[phone], isAdmin: isAdminPhone(phone) });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -320,7 +359,7 @@ app.post('/api/auth/login', (req, res) => {
 
   const users = readUsers();
   if (!users[phone]) return res.status(404).json({ error: 'Энэ дугаар бүртгэлгүй байна. Эхлээд бүртгүүлнэ үү.' });
-  res.json(users[phone]);
+  res.json({ ...users[phone], isAdmin: isAdminPhone(phone) });
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -329,9 +368,10 @@ app.get('/api/videos', (req, res) => {
   res.json(readVideos());
 });
 
-app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }]), (req, res) => {
+app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   const videoFile = req.files && req.files.video && req.files.video[0];
   const subtitleFile = req.files && req.files.subtitle && req.files.subtitle[0];
+  const thumbnailFile = req.files && req.files.thumbnail && req.files.thumbnail[0];
 
   if (!videoFile) return res.status(400).json({ error: 'Видео файл олдсонгүй.' });
 
@@ -362,6 +402,20 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
     subtitleUrl = `/uploads/${vttFilename}`;
   }
 
+  let thumbnailUrl = null;
+  if (thumbnailFile) {
+    thumbnailUrl = `/uploads/${thumbnailFile.filename}`;
+  } else {
+    try {
+      const thumbFilename = videoFile.filename.replace(/\.[^.]+$/, '') + '.jpg';
+      const thumbPath = path.join(UPLOAD_DIR, thumbFilename);
+      await generateThumbnail(videoFile.path, thumbPath);
+      thumbnailUrl = `/uploads/${thumbFilename}`;
+    } catch (e) {
+      console.error('Thumbnail generation failed:', e.message);
+    }
+  }
+
   const videos = readVideos();
   const newVideo = {
     id: Date.now(),
@@ -371,6 +425,7 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
     badge: badge || '',
     filename: videoFile.filename,
     url: `/uploads/${videoFile.filename}`,
+    thumbnailUrl,
     subtitleUrl,
     subtitleLang: subtitleUrl ? (subtitleLang || 'mn') : null,
     size: videoFile.size,
@@ -379,6 +434,26 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
   videos.push(newVideo);
   writeVideos(videos);
   res.status(201).json(newVideo);
+});
+
+app.post('/api/videos/:id/thumbnail', upload.single('thumbnail'), (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'Thumbnail зураг олдсонгүй.' });
+
+  const videos = readVideos();
+  const video = videos.find(v => String(v.id) === req.params.id);
+  if (!video) {
+    fs.unlinkSync(file.path);
+    return res.status(404).json({ error: 'Видео олдсонгүй.' });
+  }
+
+  if (video.thumbnailUrl) {
+    const oldPath = path.join(UPLOAD_DIR, path.basename(video.thumbnailUrl));
+    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  video.thumbnailUrl = `/uploads/${file.filename}`;
+  writeVideos(videos);
+  res.json(video);
 });
 
 app.delete('/api/videos/:id', (req, res) => {
@@ -391,6 +466,10 @@ app.delete('/api/videos/:id', (req, res) => {
   if (removed.subtitleUrl) {
     const subPath = path.join(UPLOAD_DIR, path.basename(removed.subtitleUrl));
     if (fs.existsSync(subPath)) fs.unlinkSync(subPath);
+  }
+  if (removed.thumbnailUrl) {
+    const thumbPath = path.join(UPLOAD_DIR, path.basename(removed.thumbnailUrl));
+    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
   }
   writeVideos(videos);
   res.json({ ok: true });
