@@ -326,6 +326,20 @@
     background: rgba(0,0,0,0.6);
     line-height: 1.3;
   }
+  .video-wrap { position: relative; display: inline-block; line-height: 0; max-width: 100%; max-height: 82vh; container-type: inline-size; }
+  .video-wrap video { display: block; max-width: 100%; max-height: 82vh; width: auto; height: auto; object-fit: contain; }
+  .sub-overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .sub-overlay .sub-text {
+    position: absolute; top: 75%; left: 3%; right: 3%; transform: translateY(-50%);
+    text-align: center; color: #fff; font-weight: 600; line-height: 1.3;
+    font-size: 4.6cqw; text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.7);
+    white-space: pre-wrap;
+  }
+  .wrap-fs-btn {
+    position: absolute; right: 10px; bottom: 10px; z-index: 5;
+    width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: rgba(10,14,12,0.55); color: #F2ECE0; display: flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -743,28 +757,64 @@
       playerToggle.style.display = 'none';
       document.querySelector('.player-bar').style.display = 'none';
 
+      const wrap = document.createElement('div');
+      wrap.className = 'video-wrap';
+
       const video = document.createElement('video');
       video.src = curVideo.videoUrl;
       if (curVideo.thumbnailUrl) video.poster = curVideo.thumbnailUrl;
       video.controls = true;
+      video.setAttribute('controlslist', 'nofullscreen');
       video.autoplay = true;
       video.playsInline = true;
 
+      const subOverlay = document.createElement('div');
+      subOverlay.className = 'sub-overlay';
+      const subText = document.createElement('div');
+      subText.className = 'sub-text';
+      subOverlay.appendChild(subText);
+
+      const fsBtn = document.createElement('button');
+      fsBtn.className = 'wrap-fs-btn';
+      fsBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+      fsBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else if (wrap.requestFullscreen) wrap.requestFullscreen();
+      });
+
       if (curVideo.subtitleUrl) {
-        const track = document.createElement('track');
-        track.kind = 'subtitles';
-        track.src = curVideo.subtitleUrl;
-        track.srclang = curVideo.subtitleLang || 'mn';
-        track.label = curVideo.subtitleLang === 'en' ? 'English' : 'Монгол';
-        track.default = true;
-        video.appendChild(track);
-        video.addEventListener('loadedmetadata', () => {
-          if (video.textTracks && video.textTracks[0]) video.textTracks[0].mode = 'showing';
+        let subCues = [];
+        function parseVTT(text){
+          const cues = [];
+          const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+          const blocks = text.replace(/\r\n/g, '\n').split(/\n\n+/);
+          blocks.forEach(block => {
+            const lines = block.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+              const m = lines[i].match(timeRe);
+              if (m) {
+                const start = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+                const end = (+m[5]) * 3600 + (+m[6]) * 60 + (+m[7]) + (+m[8]) / 1000;
+                cues.push({ start, end, text: lines.slice(i + 1).join('\n').trim() });
+                break;
+              }
+            }
+          });
+          return cues;
+        }
+        fetch(curVideo.subtitleUrl).then(r => r.text()).then(txt => { subCues = parseVTT(txt); }).catch(() => {});
+        video.addEventListener('timeupdate', () => {
+          const t = video.currentTime;
+          const cue = subCues.find(c => t >= c.start && t <= c.end);
+          subText.textContent = cue ? cue.text : '';
         });
       }
 
+      wrap.appendChild(video);
+      wrap.appendChild(subOverlay);
+      wrap.appendChild(fsBtn);
       playerArt.innerHTML = '';
-      playerArt.appendChild(video);
+      playerArt.appendChild(wrap);
     } else {
       playerStage.classList.remove('natural-ratio');
       playerToggle.style.display = 'flex';
