@@ -91,7 +91,7 @@ async function loadManualRequests() {
   const reqs = await res.json();
   manualEl.innerHTML = reqs.slice().reverse().map(r => `
     <div class="vid">
-      <span>${r.userId.slice(0,8)}… — ${r.amount}₮ — ${r.status} — ${new Date(r.createdAt).toLocaleString()}</span>
+      <span>${r.userId.slice(0,8)}… — ${r.amount}₮ (${r.planId || '1m'}) — ${r.status} — ${new Date(r.createdAt).toLocaleString()}</span>
       ${r.status === 'pending' ? `<span>
         <button onclick="approveReq(${r.id})">Батлах</button>
         <button onclick="rejectReq(${r.id})" style="background:#555;">Цуцлах</button>
