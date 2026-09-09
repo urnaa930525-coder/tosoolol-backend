@@ -6,6 +6,7 @@ const fs = require('fs');
 const { execFile } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
 const { Pool } = require('pg');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -108,7 +109,57 @@ const BANK_TRANSFER_INFO = {
 const SUBSCRIPTION_PRICE = 6900;
 const SUBSCRIPTION_DAYS = 30;
 
-app.use(cors());
+// ---------- Admin token (protects destructive/admin-only endpoints) ----------
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+function requireAdmin(req, res, next) {
+  if (!ADMIN_TOKEN) {
+    console.error('ADMIN_TOKEN is not set — refusing admin action.');
+    return res.status(503).json({ error: 'Admin тохиргоо дутуу байна.' });
+  }
+  const supplied = req.get('x-admin-token') || req.query.adminToken;
+  if (supplied !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Admin эрх шаардлагатай.' });
+  }
+  next();
+}
+
+// ---------- CORS: only allow the site's own origin(s) to call the API ----------
+const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || 'https://tosoolol-backend.onrender.com')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+app.use(cors({
+  origin: (origin, callback) => {
+    // Same-origin page loads and server-to-server/curl calls send no Origin header — allow those.
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  }
+}));
+
+// ---------- Rate limiting ----------
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Хэт олон хүсэлт. 15 минутын дараа дахин оролдоно уу.' }
+});
+const manualRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Хэт олон хүсэлт илгээсэн байна. Дараа дахин оролдоно уу.' }
+});
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Хэт олон хүсэлт. Түр хүлээгээд дахин оролдоно уу.' }
+});
+
+app.use('/api/', apiLimiter);
 app.use(express.json());
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -311,7 +362,7 @@ app.get('/api/subscribe/bank-info', (req, res) => {
   res.json({ ...BANK_TRANSFER_INFO, price: SUBSCRIPTION_PRICE });
 });
 
-app.post('/api/subscribe/manual-request', async (req, res) => {
+app.post('/api/subscribe/manual-request', manualRequestLimiter, async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
   const id = Date.now();
@@ -322,7 +373,7 @@ app.post('/api/subscribe/manual-request', async (req, res) => {
   res.status(201).json({ id, userId, amount: SUBSCRIPTION_PRICE, status: 'pending' });
 });
 
-app.get('/api/admin/manual-requests', async (req, res) => {
+app.get('/api/admin/manual-requests', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM manual_requests ORDER BY created_at ASC');
   res.json(rows.map(r => ({
     id: Number(r.id),
@@ -334,7 +385,7 @@ app.get('/api/admin/manual-requests', async (req, res) => {
   })));
 });
 
-app.post('/api/admin/manual-requests/:id/approve', async (req, res) => {
+app.post('/api/admin/manual-requests/:id/approve', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM manual_requests WHERE id = $1', [req.params.id]);
   const record = rows[0];
   if (!record) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
@@ -344,7 +395,7 @@ app.post('/api/admin/manual-requests/:id/approve', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/admin/manual-requests/:id/reject', async (req, res) => {
+app.post('/api/admin/manual-requests/:id/reject', requireAdmin, async (req, res) => {
   const { rowCount } = await pool.query(`UPDATE manual_requests SET status = 'rejected' WHERE id = $1`, [req.params.id]);
   if (!rowCount) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
   res.json({ ok: true });
@@ -355,7 +406,7 @@ function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   const { name } = req.body;
   if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
@@ -371,7 +422,7 @@ app.post('/api/auth/register', async (req, res) => {
   res.status(201).json({ phone: rows[0].phone, name: rows[0].name, createdAt: rows[0].created_at, isAdmin: isAdminPhone(phone) });
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   if (phone.length < 8) return res.status(400).json({ error: 'Утасны дугаар буруу байна.' });
 
@@ -387,7 +438,7 @@ app.get('/api/videos', async (req, res) => {
   res.json(rows.map(videoRowToJson));
 });
 
-app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
+app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   const videoFile = req.files && req.files.video && req.files.video[0];
   const subtitleFile = req.files && req.files.subtitle && req.files.subtitle[0];
   const thumbnailFile = req.files && req.files.thumbnail && req.files.thumbnail[0];
@@ -449,7 +500,7 @@ app.post('/api/upload', upload.fields([{ name: 'video', maxCount: 1 }, { name: '
   res.status(201).json(videoRowToJson(rows[0]));
 });
 
-app.post('/api/videos/:id/thumbnail', upload.single('thumbnail'), async (req, res) => {
+app.post('/api/videos/:id/thumbnail', requireAdmin, upload.single('thumbnail'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'Thumbnail зураг олдсонгүй.' });
 
@@ -472,7 +523,7 @@ app.post('/api/videos/:id/thumbnail', upload.single('thumbnail'), async (req, re
   res.json(videoRowToJson(updated[0]));
 });
 
-app.delete('/api/videos/:id', async (req, res) => {
+app.delete('/api/videos/:id', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('DELETE FROM videos WHERE id = $1 RETURNING *', [req.params.id]);
   const removed = rows[0];
   if (!removed) return res.status(404).json({ error: 'Видео олдсонгүй.' });
