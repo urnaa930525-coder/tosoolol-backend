@@ -24,6 +24,13 @@
 </head>
 <body>
   <h1>NextKino — Видео Upload (Admin)</h1>
+  <div style="background:#1a2a26; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:0.85rem;">
+    <label style="margin-top:0;">Admin токен</label>
+    <div style="display:flex; gap:8px;">
+      <input type="password" id="adminTokenInput" placeholder="ADMIN_TOKEN-ээ оруулна уу" style="margin-top:4px;">
+      <button type="button" id="saveTokenBtn" style="margin-top:4px; white-space:nowrap;">Хадгалах</button>
+    </div>
+  </div>
   <form id="uploadForm">
     <label>Нэр (title)</label>
     <input type="text" name="title" required>
@@ -62,9 +69,25 @@ const form = document.getElementById('uploadForm');
 const result = document.getElementById('result');
 const listEl = document.getElementById('list');
 const manualEl = document.getElementById('manualRequests');
+const adminTokenInput = document.getElementById('adminTokenInput');
+const saveTokenBtn = document.getElementById('saveTokenBtn');
+
+adminTokenInput.value = localStorage.getItem('nk_admin_token') || '';
+saveTokenBtn.addEventListener('click', () => {
+  localStorage.setItem('nk_admin_token', adminTokenInput.value.trim());
+  result.textContent = 'Токен хадгалагдлаа.';
+  loadVideos();
+  loadManualRequests();
+});
+
+function adminFetch(url, opts = {}) {
+  const headers = Object.assign({}, opts.headers, { 'x-admin-token': localStorage.getItem('nk_admin_token') || '' });
+  return fetch(url, Object.assign({}, opts, { headers }));
+}
 
 async function loadManualRequests() {
-  const res = await fetch('/api/admin/manual-requests');
+  const res = await adminFetch('/api/admin/manual-requests');
+  if (res.status === 401) { manualEl.innerHTML = '<p style="color:#C9604C;">Admin токен буруу эсвэл хоосон байна.</p>'; return; }
   const reqs = await res.json();
   manualEl.innerHTML = reqs.slice().reverse().map(r => `
     <div class="vid">
@@ -76,11 +99,11 @@ async function loadManualRequests() {
     </div>`).join('') || '<p style="color:#9DAEAF;">Хүсэлт алга.</p>';
 }
 async function approveReq(id) {
-  await fetch(`/api/admin/manual-requests/${id}/approve`, { method: 'POST' });
+  await adminFetch(`/api/admin/manual-requests/${id}/approve`, { method: 'POST' });
   loadManualRequests();
 }
 async function rejectReq(id) {
-  await fetch(`/api/admin/manual-requests/${id}/reject`, { method: 'POST' });
+  await adminFetch(`/api/admin/manual-requests/${id}/reject`, { method: 'POST' });
   loadManualRequests();
 }
 window.approveReq = approveReq;
@@ -150,7 +173,7 @@ function pickThumbnail(id) {
     fd.append('thumbnail', input.files[0]);
     result.textContent = 'Thumbnail шинэчилж байна...';
     try {
-      const res = await fetch(`/api/videos/${id}/thumbnail`, { method: 'POST', body: fd });
+      const res = await adminFetch(`/api/videos/${id}/thumbnail`, { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Алдаа');
       result.textContent = 'Thumbnail шинэчлэгдлээ.';
@@ -164,7 +187,7 @@ function pickThumbnail(id) {
 window.pickThumbnail = pickThumbnail;
 
 async function delVideo(id) {
-  await fetch('/api/videos/' + id, { method: 'DELETE' });
+  await adminFetch('/api/videos/' + id, { method: 'DELETE' });
   loadVideos();
 }
 window.delVideo = delVideo;
@@ -173,7 +196,7 @@ form.addEventListener('submit', async (e) => {
   e.preventDefault();
   result.textContent = 'Uploading...';
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: new FormData(form) });
+    const res = await adminFetch('/api/upload', { method: 'POST', body: new FormData(form) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Алдаа');
     result.textContent = 'Амжилттай! ID: ' + data.id + '\nURL: ' + data.url;
