@@ -51,6 +51,8 @@ async function initDb() {
       amount NUMERIC,
       description TEXT,
       user_id TEXT,
+      plan_id TEXT,
+      days INTEGER,
       status TEXT NOT NULL DEFAULT 'PENDING',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       paid_at TIMESTAMPTZ
@@ -59,10 +61,19 @@ async function initDb() {
       id BIGINT PRIMARY KEY,
       user_id TEXT NOT NULL,
       amount NUMERIC,
+      plan_id TEXT,
+      days INTEGER,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       approved_at TIMESTAMPTZ
     );
+  `);
+  // Backfill columns for pre-existing tables from before multi-tier plans were added.
+  await pool.query(`
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan_id TEXT;
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS days INTEGER;
+    ALTER TABLE manual_requests ADD COLUMN IF NOT EXISTS plan_id TEXT;
+    ALTER TABLE manual_requests ADD COLUMN IF NOT EXISTS days INTEGER;
   `);
   console.log('DB ready.');
 }
@@ -106,8 +117,15 @@ const BANK_TRANSFER_INFO = {
   holder: 'Б. Уранцэцэг'
 };
 
-const SUBSCRIPTION_PRICE = 6900;
-const SUBSCRIPTION_DAYS = 30;
+const SUBSCRIPTION_PLANS = {
+  '1m': { label: '1 сар', price: 12900, days: 30 },
+  '3m': { label: '3 сар', price: 32900, days: 90 },
+  '1y': { label: '1 жил', price: 89900, days: 365 }
+};
+const DEFAULT_PLAN_ID = '1m';
+function resolvePlan(planId) {
+  return SUBSCRIPTION_PLANS[planId] ? { id: planId, ...SUBSCRIPTION_PLANS[planId] } : { id: DEFAULT_PLAN_ID, ...SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID] };
+}
 
 // ---------- Admin token (protects destructive/admin-only endpoints) ----------
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -208,11 +226,11 @@ function generateThumbnail(videoPath, thumbPath) {
   });
 }
 
-async function activateSubscription(userId) {
+async function activateSubscription(userId, days) {
   const now = new Date();
   const { rows } = await pool.query('SELECT expires_at FROM subscribers WHERE user_id = $1', [userId]);
   const current = rows[0] && new Date(rows[0].expires_at) > now ? new Date(rows[0].expires_at) : now;
-  current.setDate(current.getDate() + SUBSCRIPTION_DAYS);
+  current.setDate(current.getDate() + (days || SUBSCRIPTION_PLANS[DEFAULT_PLAN_ID].days));
   await pool.query(
     `INSERT INTO subscribers (user_id, expires_at, last_paid_at) VALUES ($1, $2, $3)
      ON CONFLICT (user_id) DO UPDATE SET expires_at = $2, last_paid_at = $3`,
@@ -304,7 +322,7 @@ app.post('/api/qpay/callback', async (req, res) => {
         [invoiceNo]
       );
       if (invoiceNo.startsWith('SUB-') && rows[0].user_id) {
-        await activateSubscription(rows[0].user_id);
+        await activateSubscription(rows[0].user_id, rows[0].days);
       }
     }
   }
@@ -319,21 +337,22 @@ app.get('/api/qpay/status/:senderInvoiceNo', async (req, res) => {
 
 app.post('/api/subscribe/create-invoice', async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, planId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
+    const plan = resolvePlan(planId);
 
     const invoiceNo = `SUB-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const data = await createQpayInvoice({
       invoiceNo,
-      amount: SUBSCRIPTION_PRICE,
-      description: 'Гишүүнчлэл - 1 сар',
+      amount: plan.price,
+      description: `Гишүүнчлэл - ${plan.label}`,
       req
     });
 
     await pool.query(
-      `INSERT INTO payments (invoice_no, invoice_id, amount, description, user_id, status)
-       VALUES ($1, $2, $3, $4, $5, 'PENDING')`,
-      [invoiceNo, data.invoice_id, SUBSCRIPTION_PRICE, 'Гишүүнчлэл - 1 сар', userId]
+      `INSERT INTO payments (invoice_no, invoice_id, amount, description, user_id, plan_id, days, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')`,
+      [invoiceNo, data.invoice_id, plan.price, `Гишүүнчлэл - ${plan.label}`, userId, plan.id, plan.days]
     );
 
     res.status(201).json({
@@ -350,27 +369,28 @@ app.post('/api/subscribe/create-invoice', async (req, res) => {
 
 app.get('/api/subscribe/status/:userId', async (req, res) => {
   if (isAdminPhone(req.params.userId)) {
-    return res.json({ active: true, isAdmin: true, expiresAt: null, price: SUBSCRIPTION_PRICE });
+    return res.json({ active: true, isAdmin: true, expiresAt: null, plans: SUBSCRIPTION_PLANS });
   }
   const { rows } = await pool.query('SELECT expires_at FROM subscribers WHERE user_id = $1', [req.params.userId]);
   const record = rows[0];
   const active = !!record && new Date(record.expires_at) > new Date();
-  res.json({ active, expiresAt: record ? record.expires_at : null, price: SUBSCRIPTION_PRICE });
+  res.json({ active, expiresAt: record ? record.expires_at : null, plans: SUBSCRIPTION_PLANS });
 });
 
 app.get('/api/subscribe/bank-info', (req, res) => {
-  res.json({ ...BANK_TRANSFER_INFO, price: SUBSCRIPTION_PRICE });
+  res.json({ ...BANK_TRANSFER_INFO, plans: SUBSCRIPTION_PLANS });
 });
 
 app.post('/api/subscribe/manual-request', manualRequestLimiter, async (req, res) => {
-  const { userId } = req.body;
+  const { userId, planId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId шаардлагатай.' });
+  const plan = resolvePlan(planId);
   const id = Date.now();
   await pool.query(
-    `INSERT INTO manual_requests (id, user_id, amount, status) VALUES ($1, $2, $3, 'pending')`,
-    [id, userId, SUBSCRIPTION_PRICE]
+    `INSERT INTO manual_requests (id, user_id, amount, plan_id, days, status) VALUES ($1, $2, $3, $4, $5, 'pending')`,
+    [id, userId, plan.price, plan.id, plan.days]
   );
-  res.status(201).json({ id, userId, amount: SUBSCRIPTION_PRICE, status: 'pending' });
+  res.status(201).json({ id, userId, amount: plan.price, planId: plan.id, status: 'pending' });
 });
 
 app.get('/api/admin/manual-requests', requireAdmin, async (req, res) => {
@@ -379,6 +399,8 @@ app.get('/api/admin/manual-requests', requireAdmin, async (req, res) => {
     id: Number(r.id),
     userId: r.user_id,
     amount: Number(r.amount),
+    planId: r.plan_id,
+    days: r.days,
     status: r.status,
     createdAt: r.created_at,
     approvedAt: r.approved_at
@@ -391,7 +413,7 @@ app.post('/api/admin/manual-requests/:id/approve', requireAdmin, async (req, res
   if (!record) return res.status(404).json({ error: 'Хүсэлт олдсонгүй.' });
   if (record.status === 'approved') return res.status(400).json({ error: 'Аль хэдийн баталгаажсан.' });
   await pool.query(`UPDATE manual_requests SET status = 'approved', approved_at = now() WHERE id = $1`, [req.params.id]);
-  await activateSubscription(record.user_id);
+  await activateSubscription(record.user_id, record.days);
   res.json({ ok: true });
 });
 
