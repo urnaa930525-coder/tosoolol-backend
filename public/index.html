@@ -125,6 +125,10 @@
   }
   .sub-modal h3 { margin: 0 0 6px; font-size: 1.2rem; }
   .sub-modal .price { color: var(--gold); font-weight: 700; font-size: 1.5rem; margin: 4px 0 18px; }
+  .plan-tabs { display: flex; gap: 8px; margin: 10px 0 4px; }
+  .plan-tab { flex: 1; padding: 10px 6px; border-radius: 10px; border: 1.5px solid var(--border-soft, #333); background: transparent; color: inherit; cursor: pointer; text-align: center; font-size: 0.85rem; line-height: 1.35; }
+  .plan-tab strong { display: block; font-size: 0.95rem; }
+  .plan-tab.active { border-color: var(--gold); background: rgba(227,162,75,0.12); }
   .sub-modal .qr-wrap { background: #fff; border-radius: 14px; padding: 14px; margin: 0 auto 16px; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
   .sub-modal .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
   .sub-modal .qr-status { color: var(--cream-dim); font-size: 0.85rem; margin-bottom: 10px; }
@@ -508,7 +512,8 @@
   <div class="sub-modal">
     <button class="sub-modal-close" id="subModalClose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
     <h3>Гишүүнчлэл авах</h3>
-    <div class="price">6,900₮ / сар</div>
+    <div class="plan-tabs" id="planTabs"></div>
+    <div class="price" id="subPriceLabel">Ачаалж байна…</div>
     <div class="pay-tabs">
       <button class="pay-tab active" id="tabQpay">QPay-р төлөх</button>
       <button class="pay-tab" id="tabBank">Дансаар шилжүүлэх</button>
@@ -962,19 +967,26 @@
   tabBank.addEventListener('click', () => switchPayTab('bank'));
 
   async function loadBankInfo(){
-    if (bankInfoBox.dataset.loaded) return;
+    if (bankInfoBox.dataset.loaded) { renderBankAmount(); return; }
     try {
       const res = await fetch('/api/subscribe/bank-info');
       const data = await res.json();
-      bankInfoBox.innerHTML = `
-        <div><strong>Банк:</strong> ${data.bank}</div>
-        <div><strong>Данс:</strong> ${data.account}</div>
-        <div><strong>Хүлээн авагч:</strong> ${data.holder}</div>
-        <div><strong>Дүн:</strong> ${data.price.toLocaleString()}₮</div>`;
+      bankInfoStatic = data;
+      if (!plansLoaded) renderPlanTabs(data.plans);
       bankInfoBox.dataset.loaded = '1';
+      renderBankAmount();
     } catch (e) {
       bankInfoBox.textContent = 'Мэдээлэл ачаалж чадсангүй.';
     }
+  }
+  function renderBankAmount(){
+    if (!bankInfoStatic) return;
+    const plan = bankInfoStatic.plans[selectedPlanId];
+    bankInfoBox.innerHTML = `
+      <div><strong>Банк:</strong> ${bankInfoStatic.bank}</div>
+      <div><strong>Данс:</strong> ${bankInfoStatic.account}</div>
+      <div><strong>Хүлээн авагч:</strong> ${bankInfoStatic.holder}</div>
+      <div><strong>Дүн:</strong> ${plan.price.toLocaleString()}₮ (${plan.label})</div>`;
   }
 
   bankConfirmBtn.addEventListener('click', async () => {
@@ -983,7 +995,7 @@
     try {
       const res = await fetch('/api/subscribe/manual-request', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: USER_ID })
+        body: JSON.stringify({ userId: USER_ID, planId: selectedPlanId })
       });
       if (!res.ok) throw new Error();
       bankStatusText.textContent = 'Хүсэлт бүртгэгдлээ. Шилжүүлгийг шалгаад 24 цагийн дотор гишүүнчлэл идэвхжинэ.';
@@ -1009,6 +1021,37 @@
     } catch (e) { return false; }
   }
 
+  let selectedPlanId = '1m';
+  let plansLoaded = false;
+  let bankInfoStatic = null;
+  const planTabsEl = document.getElementById('planTabs');
+  const subPriceLabel = document.getElementById('subPriceLabel');
+
+  function renderPlanTabs(plans){
+    plansLoaded = true;
+    const order = ['1m', '3m', '1y'];
+    planTabsEl.innerHTML = order.filter(id => plans[id]).map(id => {
+      const p = plans[id];
+      return `<button type="button" class="plan-tab${id === selectedPlanId ? ' active' : ''}" data-plan="${id}">
+        <strong>${p.label}</strong>${p.price.toLocaleString()}₮
+      </button>`;
+    }).join('');
+    updatePriceLabel(plans);
+    planTabsEl.querySelectorAll('.plan-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedPlanId = btn.dataset.plan;
+        planTabsEl.querySelectorAll('.plan-tab').forEach(b => b.classList.toggle('active', b === btn));
+        updatePriceLabel(plans);
+        renderBankAmount();
+        openSubModal(); // re-create the QPay invoice for the newly selected plan
+      });
+    });
+  }
+  function updatePriceLabel(plans){
+    const p = plans[selectedPlanId];
+    subPriceLabel.textContent = p ? `${p.price.toLocaleString()}₮ / ${p.label}` : '';
+  }
+
   async function openSubModal(){
     subModalBackdrop.classList.add('open');
     switchPayTab('qpay');
@@ -1017,10 +1060,18 @@
     subStatusText.textContent = 'QR код бэлдэж байна…';
     subQrImg.src = '';
     subLinks.innerHTML = '';
+    if (!plansLoaded) {
+      try {
+        const res = await fetch('/api/subscribe/bank-info');
+        const data = await res.json();
+        bankInfoStatic = data;
+        renderPlanTabs(data.plans);
+      } catch (e) { /* plan tabs stay empty; price still sent via selectedPlanId default */ }
+    }
     try {
       const res = await fetch('/api/subscribe/create-invoice', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: USER_ID })
+        body: JSON.stringify({ userId: USER_ID, planId: selectedPlanId })
       });
       const data = await res.json();
       if (!res.ok) {
