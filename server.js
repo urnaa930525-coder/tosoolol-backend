@@ -3,10 +3,22 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { execFile } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
+const os = require('os');
+const cloudinary = require('cloudinary').v2;
 const { Pool } = require('pg');
 const rateLimit = require('express-rate-limit');
+
+// ---------- Cloudinary (persistent file storage) ----------
+// Render's free web services wipe local disk on every redeploy, so video/
+// thumbnail/subtitle files can't live there. Cloudinary stores them
+// permanently and serves them over its own CDN instead.
+// Set CLOUDINARY_URL (format: cloudinary://<api_key>:<api_secret>@<cloud_name>)
+// in Render's environment variables — cloudinary configures itself from it.
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config(true); // picks up CLOUDINARY_URL automatically
+} else {
+  console.error('CLOUDINARY_URL тохируулаагүй байна — файл хадгалалт ажиллахгүй.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +49,9 @@ async function initDb() {
       thumbnail_url TEXT,
       subtitle_url TEXT,
       subtitle_lang TEXT,
+      video_public_id TEXT,
+      thumbnail_public_id TEXT,
+      subtitle_public_id TEXT,
       size BIGINT,
       uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
@@ -74,6 +89,9 @@ async function initDb() {
     ALTER TABLE payments ADD COLUMN IF NOT EXISTS days INTEGER;
     ALTER TABLE manual_requests ADD COLUMN IF NOT EXISTS plan_id TEXT;
     ALTER TABLE manual_requests ADD COLUMN IF NOT EXISTS days INTEGER;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_public_id TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_public_id TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle_public_id TEXT;
   `);
   console.log('DB ready.');
 }
@@ -108,7 +126,11 @@ function isAdminPhone(phone) {
   return ADMIN_PHONES.has(String(phone || '').replace(/\D/g, ''));
 }
 
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
+// Scratch space only — multer writes here temporarily during an upload
+// request, we push the file to Cloudinary, then delete the local copy.
+// It's fine that this directory is wiped on redeploy; nothing here is
+// meant to survive past the request that created it.
+const UPLOAD_DIR = path.join(os.tmpdir(), 'nextkino-uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const BANK_TRANSFER_INFO = {
@@ -179,7 +201,6 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 app.use(express.json());
-app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- Storage config ----------
@@ -210,19 +231,20 @@ const upload = multer({
   }
 });
 
-// ---------- Thumbnail generation ----------
-function generateThumbnail(videoPath, thumbPath) {
-  return new Promise((resolve, reject) => {
-    execFile(ffmpegPath, [
-      '-y',
-      '-ss', '1',
-      '-i', videoPath,
-      '-frames:v', '1',
-      '-vf', 'scale=480:-2',
-      thumbPath
-    ], (err) => {
-      if (err) reject(err); else resolve();
+// ---------- Cloudinary upload/delete helpers ----------
+// Uploads a local (temp) file to Cloudinary and deletes the local copy
+// afterwards either way, so scratch space never accumulates.
+function uploadToCloudinary(localPath, options) {
+  return cloudinary.uploader.upload(localPath, options)
+    .finally(() => {
+      if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
     });
+}
+
+function destroyOnCloudinary(publicId, resourceType) {
+  if (!publicId) return Promise.resolve();
+  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType }).catch(e => {
+    console.error('Cloudinary устгах алдаа:', e.message);
   });
 }
 
@@ -469,57 +491,81 @@ app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 
 
   const { title, category, description, badge, subtitleLang } = req.body;
   if (!title || !category) {
-    fs.unlinkSync(videoFile.path);
-    if (subtitleFile) fs.unlinkSync(subtitleFile.path);
+    if (fs.existsSync(videoFile.path)) fs.unlinkSync(videoFile.path);
+    if (subtitleFile && fs.existsSync(subtitleFile.path)) fs.unlinkSync(subtitleFile.path);
+    if (thumbnailFile && fs.existsSync(thumbnailFile.path)) fs.unlinkSync(thumbnailFile.path);
     return res.status(400).json({ error: 'title болон category заавал шаардлагатай.' });
   }
 
-  let subtitleUrl = null;
-  if (subtitleFile) {
-    const ext = path.extname(subtitleFile.originalname).toLowerCase();
-    const vttFilename = subtitleFile.filename.replace(/\.[^.]+$/, '') + '.vtt';
-    const vttPath = path.join(UPLOAD_DIR, vttFilename);
-    if (ext === '.vtt') {
-      fs.renameSync(subtitleFile.path, vttPath);
+  try {
+    // Video -> Cloudinary (resource_type 'video' also covers audio/streaming assets)
+    const videoUpload = await uploadToCloudinary(videoFile.path, {
+      resource_type: 'video',
+      folder: 'nextkino/videos'
+    });
+
+    // Subtitle -> convert SRT to WebVTT if needed, then upload as a raw asset
+    let subtitleUrl = null;
+    let subtitlePublicId = null;
+    if (subtitleFile) {
+      const ext = path.extname(subtitleFile.originalname).toLowerCase();
+      let vttPath = subtitleFile.path;
+      if (ext !== '.vtt') {
+        const srtContent = fs.readFileSync(subtitleFile.path, 'utf-8');
+        const vttContent = 'WEBVTT\n\n' + srtContent
+          .replace(/\r\n/g, '\n')
+          .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+          .replace(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})\s*$/gm, '$1 line:75%');
+        vttPath = subtitleFile.path + '.vtt';
+        fs.writeFileSync(vttPath, vttContent, 'utf-8');
+        fs.unlinkSync(subtitleFile.path);
+      }
+      const subUpload = await uploadToCloudinary(vttPath, {
+        resource_type: 'raw',
+        folder: 'nextkino/subtitles',
+        format: 'vtt'
+      });
+      subtitleUrl = subUpload.secure_url;
+      subtitlePublicId = subUpload.public_id;
+    }
+
+    // Thumbnail -> use the uploaded image if given, otherwise let Cloudinary
+    // auto-grab a frame from the video itself (no ffmpeg needed).
+    let thumbnailUrl;
+    let thumbnailPublicId = null;
+    if (thumbnailFile) {
+      const thumbUpload = await uploadToCloudinary(thumbnailFile.path, {
+        resource_type: 'image',
+        folder: 'nextkino/thumbnails'
+      });
+      thumbnailUrl = thumbUpload.secure_url;
+      thumbnailPublicId = thumbUpload.public_id;
     } else {
-      // Convert SRT -> WebVTT: comma decimals -> dot, add WEBVTT header, position cues higher
-      const srtContent = fs.readFileSync(subtitleFile.path, 'utf-8');
-      const vttContent = 'WEBVTT\n\n' + srtContent
-        .replace(/\r\n/g, '\n')
-        .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
-        .replace(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})\s*$/gm, '$1 line:75%');
-      fs.writeFileSync(vttPath, vttContent, 'utf-8');
-      fs.unlinkSync(subtitleFile.path);
+      thumbnailUrl = cloudinary.url(videoUpload.public_id, {
+        resource_type: 'video',
+        format: 'jpg',
+        start_offset: '1',
+        width: 480,
+        crop: 'scale'
+      });
     }
-    subtitleUrl = `/uploads/${vttFilename}`;
-  }
 
-  let thumbnailUrl = null;
-  if (thumbnailFile) {
-    thumbnailUrl = `/uploads/${thumbnailFile.filename}`;
-  } else {
-    try {
-      const thumbFilename = videoFile.filename.replace(/\.[^.]+$/, '') + '.jpg';
-      const thumbPath = path.join(UPLOAD_DIR, thumbFilename);
-      await generateThumbnail(videoFile.path, thumbPath);
-      thumbnailUrl = `/uploads/${thumbFilename}`;
-    } catch (e) {
-      console.error('Thumbnail generation failed:', e.message);
-    }
+    const id = Date.now();
+    const { rows } = await pool.query(
+      `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size, video_public_id, thumbnail_public_id, subtitle_public_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      [
+        id, title, category, description || '', badge || '',
+        videoFile.originalname, videoUpload.secure_url,
+        thumbnailUrl, subtitleUrl, subtitleUrl ? (subtitleLang || 'mn') : null,
+        videoFile.size, videoUpload.public_id, thumbnailPublicId, subtitlePublicId
+      ]
+    );
+    res.status(201).json(videoRowToJson(rows[0]));
+  } catch (e) {
+    console.error('Upload failed:', e.message);
+    res.status(500).json({ error: 'Cloudinary руу байршуулахад алдаа гарлаа: ' + e.message });
   }
-
-  const id = Date.now();
-  const { rows } = await pool.query(
-    `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [
-      id, title, category, description || '', badge || '',
-      videoFile.filename, `/uploads/${videoFile.filename}`,
-      thumbnailUrl, subtitleUrl, subtitleUrl ? (subtitleLang || 'mn') : null,
-      videoFile.size
-    ]
-  );
-  res.status(201).json(videoRowToJson(rows[0]));
 });
 
 app.post('/api/videos/:id/thumbnail', requireAdmin, upload.single('thumbnail'), async (req, res) => {
@@ -529,36 +575,38 @@ app.post('/api/videos/:id/thumbnail', requireAdmin, upload.single('thumbnail'), 
   const { rows } = await pool.query('SELECT * FROM videos WHERE id = $1', [req.params.id]);
   const video = rows[0];
   if (!video) {
-    fs.unlinkSync(file.path);
+    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     return res.status(404).json({ error: 'Видео олдсонгүй.' });
   }
 
-  if (video.thumbnail_url) {
-    const oldPath = path.join(UPLOAD_DIR, path.basename(video.thumbnail_url));
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  try {
+    const thumbUpload = await uploadToCloudinary(file.path, {
+      resource_type: 'image',
+      folder: 'nextkino/thumbnails'
+    });
+    // Only remove the old Cloudinary thumbnail if it was a real uploaded
+    // image (not an auto-generated video-frame URL, which has no owned id).
+    if (video.thumbnail_public_id) {
+      await destroyOnCloudinary(video.thumbnail_public_id, 'image');
+    }
+    const { rows: updated } = await pool.query(
+      'UPDATE videos SET thumbnail_url = $1, thumbnail_public_id = $2 WHERE id = $3 RETURNING *',
+      [thumbUpload.secure_url, thumbUpload.public_id, req.params.id]
+    );
+    res.json(videoRowToJson(updated[0]));
+  } catch (e) {
+    console.error('Thumbnail upload failed:', e.message);
+    res.status(500).json({ error: 'Thumbnail байршуулахад алдаа гарлаа: ' + e.message });
   }
-  const thumbnailUrl = `/uploads/${file.filename}`;
-  const { rows: updated } = await pool.query(
-    'UPDATE videos SET thumbnail_url = $1 WHERE id = $2 RETURNING *',
-    [thumbnailUrl, req.params.id]
-  );
-  res.json(videoRowToJson(updated[0]));
 });
 
 app.delete('/api/videos/:id', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('DELETE FROM videos WHERE id = $1 RETURNING *', [req.params.id]);
   const removed = rows[0];
   if (!removed) return res.status(404).json({ error: 'Видео олдсонгүй.' });
-  const filePath = path.join(UPLOAD_DIR, removed.filename);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  if (removed.subtitle_url) {
-    const subPath = path.join(UPLOAD_DIR, path.basename(removed.subtitle_url));
-    if (fs.existsSync(subPath)) fs.unlinkSync(subPath);
-  }
-  if (removed.thumbnail_url) {
-    const thumbPath = path.join(UPLOAD_DIR, path.basename(removed.thumbnail_url));
-    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
-  }
+  await destroyOnCloudinary(removed.video_public_id, 'video');
+  if (removed.thumbnail_public_id) await destroyOnCloudinary(removed.thumbnail_public_id, 'image');
+  if (removed.subtitle_public_id) await destroyOnCloudinary(removed.subtitle_public_id, 'raw');
   res.json({ ok: true });
 });
 
