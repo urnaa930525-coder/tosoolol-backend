@@ -833,6 +833,25 @@
       playerArt.innerHTML = '';
       playerArt.appendChild(wrap);
 
+      // Some browsers don't reliably reflow a <video> to its real size once
+      // metadata loads (it can stay collapsed until fullscreen forces a
+      // layout pass). Set explicit pixel dimensions ourselves so the video
+      // is visibly sized without needing fullscreen.
+      function sizeVideoToFit(){
+        if (!video.videoWidth || !video.videoHeight) return;
+        const maxH = window.innerHeight * 0.82;
+        const maxW = playerStage.clientWidth || wrap.parentElement.clientWidth || window.innerWidth;
+        const ratio = video.videoWidth / video.videoHeight;
+        let h = maxH, w = h * ratio;
+        if (w > maxW) { w = maxW; h = w / ratio; }
+        video.style.width = w + 'px';
+        video.style.height = h + 'px';
+        wrap.style.width = w + 'px';
+        wrap.style.height = h + 'px';
+      }
+      video.addEventListener('loadedmetadata', sizeVideoToFit);
+      window.addEventListener('resize', sizeVideoToFit);
+
       // Mobile browsers block autoplay with sound unless it's triggered by a
       // real user tap, or the video is muted. Try to play with sound first;
       // if that's blocked, fall back to a muted autoplay so the video isn't
