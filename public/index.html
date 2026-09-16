@@ -781,8 +781,9 @@
       if (curVideo.thumbnailUrl) video.poster = curVideo.thumbnailUrl;
       video.controls = true;
       video.setAttribute('controlslist', 'nofullscreen');
-      video.autoplay = true;
+      video.setAttribute('webkit-playsinline', '');
       video.playsInline = true;
+      video.autoplay = true;
 
       const subOverlay = document.createElement('div');
       subOverlay.className = 'sub-overlay';
@@ -831,6 +832,25 @@
       wrap.appendChild(fsBtn);
       playerArt.innerHTML = '';
       playerArt.appendChild(wrap);
+
+      // Mobile browsers block autoplay with sound unless it's triggered by a
+      // real user tap, or the video is muted. Try to play with sound first;
+      // if that's blocked, fall back to a muted autoplay so the video isn't
+      // left stuck on a static frame, and give the person a visible tap
+      // target to unmute.
+      const tryPlay = video.play();
+      if (tryPlay && typeof tryPlay.catch === 'function') {
+        tryPlay.catch(() => {
+          video.muted = true;
+          video.play().catch(() => {});
+          const unmuteBtn = document.createElement('button');
+          unmuteBtn.className = 'wrap-fs-btn';
+          unmuteBtn.style.right = '54px';
+          unmuteBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5zM19 5l-6 14"/></svg>';
+          unmuteBtn.addEventListener('click', () => { video.muted = false; unmuteBtn.remove(); });
+          wrap.appendChild(unmuteBtn);
+        });
+      }
     } else {
       playerStage.classList.remove('natural-ratio');
       playerToggle.style.display = 'flex';
