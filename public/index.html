@@ -653,12 +653,18 @@
   document.getElementById('menuBtn').onclick = () => sidebar.classList.toggle('open');
 
   // ---------- Hero ----------
-  const heroVid = VIDEOS[4];
-  document.getElementById('heroCanvas').innerHTML = artSVG(heroVid, true);
-  document.getElementById('heroTitle').textContent = heroVid.title;
-  document.getElementById('heroDesc').textContent = heroVid.desc;
-  document.getElementById('heroPlay').onclick = () => openPlayer(heroVid.id);
-  document.getElementById('heroInfo').onclick = () => openPlayer(heroVid.id);
+  function renderHero(){
+    const latestUpload = uploadedVideos.length ? uploadedVideos[uploadedVideos.length - 1] : null;
+    const v = latestUpload || VIDEOS[4];
+    document.getElementById('heroCanvas').innerHTML = (v.isUploaded && v.thumbnailUrl)
+      ? `<img src="${v.thumbnailUrl}" style="width:100%;height:100%;object-fit:cover;">`
+      : artSVG(v, true);
+    document.getElementById('heroTitle').textContent = v.title;
+    document.getElementById('heroDesc').textContent = v.desc;
+    document.getElementById('heroPlay').onclick = () => openPlayer(v.id);
+    document.getElementById('heroInfo').onclick = () => openPlayer(v.id);
+  }
+  renderHero();
 
   // ---------- Search ----------
   const searchInput = document.getElementById('searchInput');
@@ -723,7 +729,7 @@
     if (!shown) rowsEl.innerHTML = '<p class="empty-msg">Энд одоогоор контент алга байна.</p>';
   }
   render();
-  loadUploadedVideos().then(render);
+  loadUploadedVideos().then(() => { render(); renderHero(); });
 
   // ---------- Player modal ----------
   const backdrop = document.getElementById('modalBackdrop');
