@@ -213,7 +213,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max per file
+  limits: { fileSize: 3 * 1024 * 1024 * 1024 }, // 3GB max per file
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'subtitle') {
       const ext = path.extname(file.originalname).toLowerCase();
