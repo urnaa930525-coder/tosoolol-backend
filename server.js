@@ -42,12 +42,20 @@ async function uploadVideoToBunny(localPath, title){
   const created = await createRes.json();
   const guid = created.guid;
 
-  // 2) Upload the actual file bytes
-  const fileBuffer = fs.readFileSync(localPath);
+  // 2) Upload the actual file bytes — stream it rather than reading the
+  // whole file into memory first. A full-length movie (1-4GB+) read via
+  // fs.readFileSync would exceed Render's free-tier 512MB RAM and crash
+  // the process outright (which the browser just sees as "Failed to fetch").
+  const stat = fs.statSync(localPath);
   const uploadRes = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${guid}`, {
     method: 'PUT',
-    headers: { 'AccessKey': BUNNY_API_KEY, 'Content-Type': 'application/octet-stream' },
-    body: fileBuffer
+    headers: {
+      'AccessKey': BUNNY_API_KEY,
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(stat.size)
+    },
+    body: fs.createReadStream(localPath),
+    duplex: 'half'
   });
   if (!uploadRes.ok) throw new Error('Bunny руу видео upload хийхэд алдаа гарлаа: ' + (await uploadRes.text()));
 
