@@ -357,6 +357,7 @@
   }
 </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 <body>
 
 <div class="entry-overlay" id="entryOverlay">
@@ -767,13 +768,26 @@
       wrap.className = 'video-wrap';
 
       const video = document.createElement('video');
-      video.src = curVideo.videoUrl;
       if (curVideo.thumbnailUrl) video.poster = curVideo.thumbnailUrl;
       video.controls = true;
       video.setAttribute('controlslist', 'nofullscreen');
       video.setAttribute('webkit-playsinline', '');
       video.playsInline = true;
       video.autoplay = true;
+
+      // Bunny Stream serves HLS (.m3u8), which most non-Safari browsers
+      // can't play from a plain <video src>. hls.js decodes it in JS;
+      // Safari gets native HLS support and doesn't need it.
+      const isHls = /\.m3u8($|\?)/.test(curVideo.videoUrl);
+      if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = curVideo.videoUrl;
+      } else if (isHls && window.Hls && window.Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(curVideo.videoUrl);
+        hls.attachMedia(video);
+      } else {
+        video.src = curVideo.videoUrl;
+      }
 
       const subOverlay = document.createElement('div');
       subOverlay.className = 'sub-overlay';
