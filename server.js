@@ -20,6 +20,54 @@ if (process.env.CLOUDINARY_URL) {
   console.error('CLOUDINARY_URL тохируулаагүй байна — файл хадгалалт ажиллахгүй.');
 }
 
+// ---------- Bunny.net Stream (full-length movies, >100MB) ----------
+// Cloudinary's free plan caps video uploads at 100MB, which full-length
+// movies routinely exceed. Bunny Stream has no such per-file cap, so all
+// video files now go there; thumbnails/subtitles still use Cloudinary.
+const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
+const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
+const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME; // e.g. vz-319a1e80-e2a.b-cdn.net
+if (!BUNNY_LIBRARY_ID || !BUNNY_API_KEY || !BUNNY_CDN_HOSTNAME) {
+  console.error('BUNNY_LIBRARY_ID / BUNNY_API_KEY / BUNNY_CDN_HOSTNAME тохируулаагүй байна — видео upload ажиллахгүй.');
+}
+
+async function uploadVideoToBunny(localPath, title){
+  // 1) Create the video entry
+  const createRes = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos`, {
+    method: 'POST',
+    headers: { 'AccessKey': BUNNY_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  if (!createRes.ok) throw new Error('Bunny video үүсгэхэд алдаа гарлаа: ' + (await createRes.text()));
+  const created = await createRes.json();
+  const guid = created.guid;
+
+  // 2) Upload the actual file bytes
+  const fileBuffer = fs.readFileSync(localPath);
+  const uploadRes = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${guid}`, {
+    method: 'PUT',
+    headers: { 'AccessKey': BUNNY_API_KEY, 'Content-Type': 'application/octet-stream' },
+    body: fileBuffer
+  });
+  if (!uploadRes.ok) throw new Error('Bunny руу видео upload хийхэд алдаа гарлаа: ' + (await uploadRes.text()));
+
+  if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+
+  return {
+    guid,
+    playbackUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/playlist.m3u8`,
+    thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/thumbnail.jpg`
+  };
+}
+
+function destroyOnBunny(guid){
+  if (!guid) return Promise.resolve();
+  return fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${guid}`, {
+    method: 'DELETE',
+    headers: { 'AccessKey': BUNNY_API_KEY }
+  }).catch(e => console.error('Bunny устгах алдаа:', e.message));
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -92,6 +140,8 @@ async function initDb() {
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_public_id TEXT;
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_public_id TEXT;
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle_public_id TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS bunny_video_id TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_provider TEXT DEFAULT 'cloudinary';
   `);
   console.log('DB ready.');
 }
@@ -498,11 +548,8 @@ app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 
   }
 
   try {
-    // Video -> Cloudinary (resource_type 'video' also covers audio/streaming assets)
-    const videoUpload = await uploadToCloudinary(videoFile.path, {
-      resource_type: 'video',
-      folder: 'nextkino/videos'
-    });
+    // Video -> Bunny Stream (no per-file size cap, unlike Cloudinary's free plan)
+    const bunnyUpload = await uploadVideoToBunny(videoFile.path, title);
 
     // Subtitle -> convert SRT to WebVTT if needed, then upload as a raw asset
     let subtitleUrl = null;
@@ -529,8 +576,8 @@ app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 
       subtitlePublicId = subUpload.public_id;
     }
 
-    // Thumbnail -> use the uploaded image if given, otherwise let Cloudinary
-    // auto-grab a frame from the video itself (no ffmpeg needed).
+    // Thumbnail -> use the uploaded image if given, otherwise Bunny's own
+    // auto-generated frame (ready a little after encoding finishes).
     let thumbnailUrl;
     let thumbnailPublicId = null;
     if (thumbnailFile) {
@@ -541,30 +588,24 @@ app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 
       thumbnailUrl = thumbUpload.secure_url;
       thumbnailPublicId = thumbUpload.public_id;
     } else {
-      thumbnailUrl = cloudinary.url(videoUpload.public_id, {
-        resource_type: 'video',
-        format: 'jpg',
-        start_offset: '1',
-        width: 480,
-        crop: 'scale'
-      });
+      thumbnailUrl = bunnyUpload.thumbnailUrl;
     }
 
     const id = Date.now();
     const { rows } = await pool.query(
-      `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size, video_public_id, thumbnail_public_id, subtitle_public_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+      `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size, thumbnail_public_id, subtitle_public_id, bunny_video_id, video_provider)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         id, title, category, description || '', badge || '',
-        videoFile.originalname, videoUpload.secure_url,
+        videoFile.originalname, bunnyUpload.playbackUrl,
         thumbnailUrl, subtitleUrl, subtitleUrl ? (subtitleLang || 'mn') : null,
-        videoFile.size, videoUpload.public_id, thumbnailPublicId, subtitlePublicId
+        videoFile.size, thumbnailPublicId, subtitlePublicId, bunnyUpload.guid, 'bunny'
       ]
     );
     res.status(201).json(videoRowToJson(rows[0]));
   } catch (e) {
     console.error('Upload failed:', e.message);
-    res.status(500).json({ error: 'Cloudinary руу байршуулахад алдаа гарлаа: ' + e.message });
+    res.status(500).json({ error: 'Видео байршуулахад алдаа гарлаа: ' + e.message });
   }
 });
 
@@ -604,7 +645,11 @@ app.delete('/api/videos/:id', requireAdmin, async (req, res) => {
   const { rows } = await pool.query('DELETE FROM videos WHERE id = $1 RETURNING *', [req.params.id]);
   const removed = rows[0];
   if (!removed) return res.status(404).json({ error: 'Видео олдсонгүй.' });
-  await destroyOnCloudinary(removed.video_public_id, 'video');
+  if (removed.video_provider === 'bunny') {
+    await destroyOnBunny(removed.bunny_video_id);
+  } else if (removed.video_public_id) {
+    await destroyOnCloudinary(removed.video_public_id, 'video');
+  }
   if (removed.thumbnail_public_id) await destroyOnCloudinary(removed.thumbnail_public_id, 'image');
   if (removed.subtitle_public_id) await destroyOnCloudinary(removed.subtitle_public_id, 'raw');
   res.json({ ok: true });
