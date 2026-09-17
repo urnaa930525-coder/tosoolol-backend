@@ -585,26 +585,7 @@
   }
 
   // ---------- Content data ----------
-  const VIDEOS = [
-    { id:1, cat:'ai', sub:'Анимэйшн', title:'Сарны Дуу', desc:'Тэнгэрт мөнхөрсөн сарны бүжигт уригдсан охины түүх.', badge:'6:20', dur:380, hue:38 },
-    { id:2, cat:'ai', sub:'Анимэйшн', title:'Талын Ботго', desc:'Талын өргөн уудамд ганцаараа өссөн ботгоны адал явдал.', badge:'8:45', dur:525, hue:150 },
-    { id:3, cat:'ai', sub:'Анимэйшн', title:'Гэрлийн Хот', desc:'Шөнийн хотын гэрэлд амилсан жижиг амьтдын ертөнц.', badge:'5:10', dur:310, hue:280 },
-    { id:4, cat:'ai', sub:'Богино кино', title:'Сүүлчийн Буудал', desc:'Галт тэрэгний сүүлчийн буудал дээр тохиолдсон санамсаргүй уулзалт.', badge:'14:20', dur:860, hue:10 },
-    { id:5, cat:'ai', sub:'Богино кино', title:'Хоёр Дахь Амьдрал', desc:'Хуучин байшинд амьдардаг хоёр үеийн хоорондох дуугүй яриа.', badge:'16:40', dur:1000, hue:260 },
-    { id:6, cat:'ai', sub:'Клип', title:'Хотын Судал', desc:'Мегаполисын амьсгал, өдрөөс шөнө хүртэлх хэмнэл.', badge:'2:30', dur:150, hue:340 },
-    { id:7, cat:'ai', sub:'Клип', title:'Гэрлийн Тоглоом', desc:'Неон гэрлүүдийн хэмнэлтэй бүжиг.', badge:'3:10', dur:190, hue:300 },
-    { id:8, cat:'movie', sub:'Кино', title:'Зэрлэг Зам', desc:'Говийн замд адал явдалд орсон жолоочийн түүх.', badge:'1ц 42м', dur:6120, hue:15 },
-    { id:9, cat:'movie', sub:'Кино', title:'Мөнхийн Зам', desc:'Хайр, хүлээлт, буцаж ирэлтийн тухай уран сайхны кино.', badge:'1ц 55м', dur:6900, hue:200 },
-    { id:10, cat:'movie', sub:'Кино', title:'Гэрэл Далай', desc:'Далайчны гэр бүлийн гурван үеийн түүх.', badge:'2ц 05м', dur:7500, hue:195 },
-    { id:11, cat:'movie', sub:'Кино', title:'Сүүлчийн Ан', desc:'Уулын араас гарч ирсэн нууцлаг араатны тухай триллер.', badge:'1ц 48м', dur:6480, hue:100 },
-    { id:12, cat:'series', sub:'Цуврал', title:'Алтан Гүүр', desc:'Хоёр гэр бүлийн хоорондох залгамжлалын тэмцэл.', badge:'12-р анги', dur:2600, hue:45 },
-    { id:13, cat:'series', sub:'Цуврал', title:'Нууц Хаяг', desc:'Мөрдөгчийн ул мөрөөр өрнөх дуулиантай цуврал.', badge:'8-р анги', dur:2500, hue:8 },
-    { id:14, cat:'series', sub:'Цуврал', title:'Хотын Сүүдэр', desc:'Хотын харанхуй захад амьдрах өсвөр насныхны түүх.', badge:'15-р анги', dur:2400, hue:250 },
-    { id:15, cat:'series', sub:'Цуврал', title:'Гэрийн Тэнгэр', desc:'Нэгэн гэр бүлийн дулаан, инээд гунигтай өдөр тутам.', badge:'6-р анги', dur:2300, hue:130 },
-    { id:16, cat:'show', sub:'Нэвтрүүлэг', title:'Гал Тогооны Дуэль', desc:'Тогооч нарын өрсөлдөөнт нэвтрүүлэг.', badge:'20-р анги', dur:2700, hue:25 },
-    { id:17, cat:'show', sub:'Нэвтрүүлэг', title:'Аяллын Тэмдэглэл', desc:'Монголын алслагдсан булан бүрийг таниулах аяллын нэвтрүүлэг.', badge:'9-р анги', dur:1800, hue:170 },
-    { id:18, cat:'show', sub:'Нэвтрүүлэг', title:'Шинжлэх Ухааны Цаг', desc:'Өдөр тутмын шинжлэх ухааны сонирхолтой баримт.', badge:'14-р анги', dur:1500, hue:210 }
-  ];
+  const VIDEOS = [];
 
   function allVideos(){ return uploadedVideos.concat(VIDEOS); }
 
@@ -656,6 +637,9 @@
   function renderHero(){
     const latestUpload = uploadedVideos.length ? uploadedVideos[uploadedVideos.length - 1] : null;
     const v = latestUpload || VIDEOS[4];
+    const heroEl = document.getElementById('hero');
+    if (!v) { heroEl.style.display = 'none'; return; }
+    heroEl.style.display = '';
     document.getElementById('heroCanvas').innerHTML = (v.isUploaded && v.thumbnailUrl)
       ? `<img src="${v.thumbnailUrl}" style="width:100%;height:100%;object-fit:cover;">`
       : artSVG(v, true);
