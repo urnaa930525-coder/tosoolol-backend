@@ -273,6 +273,17 @@
   .grid-row::-webkit-scrollbar { height: 6px; }
   .grid-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 
+  @media (max-width: 640px) {
+    .grid-row {
+      display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important;
+      overflow-x: visible !important; overflow-y: visible !important; scroll-snap-type: none !important; padding-bottom: 0 !important;
+    }
+    .poster { width: 100% !important; flex: unset !important; }
+    .poster-title { font-size: 0.72rem; left: 8px; right: 8px; bottom: 8px; }
+    .poster-badge { font-size: 0.58rem; padding: 2px 7px; }
+    .row-arrow { display: none; }
+  }
+
   .poster {
     flex: 0 0 165px; scroll-snap-align: start; cursor: pointer;
     border-radius: 14px; overflow: hidden; position: relative; aspect-ratio: 2/3;
