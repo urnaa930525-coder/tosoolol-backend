@@ -440,7 +440,7 @@
     <div class="content">
       <section class="tagline">
         <h1 class="tagline-title">Your Story Begins Here</h1>
-        <p class="tagline-sub">Сэтгэл хөдөлгөх кино, цуврал контентуудыг нэг л удаа төлж, хүссэнээрээ хязгааргүй үзээрэй.</p>
+        <p class="tagline-sub">Сэтгэл хөдөлгөм кино, цуврал контентуудыг нэг л удаа төлж, хүссэнээрээ хязгааргүй үзээрэй.</p>
       </section>
 
       <section class="hero" id="hero">
@@ -539,6 +539,10 @@
 
 <script>
 (function(){
+  // ---------- Auth state (declared early: render() below reads IS_ADMIN) ----------
+  let USER_ID = localStorage.getItem('tosoolol_phone') || null;
+  let IS_ADMIN = localStorage.getItem('tosoolol_admin') === '1';
+
   // ---------- Nav / categories ----------
   const CATS = [
     { id:'all', label:'Нүүр хуудас', icon:'<circle cx="12" cy="12" r="9"/>' },
@@ -667,7 +671,7 @@
     let defs;
     if (activeCat === 'fav') defs = [{ key:'fav', label:'Таалагдсан', filter: v => favs.includes(v.id) }];
     else if (activeCat === 'later' || activeCat === 'history') defs = [{ key:activeCat, label: activeCat==='later' ? 'Дараа үзэх' : 'Үзсэн түүх', filter: () => false }];
-    else if (activeCat === 'all') defs = ROW_DEFS;
+    else if (activeCat === 'all') defs = IS_ADMIN ? ROW_DEFS : ROW_DEFS.filter(d => d.key !== 'uploaded');
     else defs = [{ key:activeCat, label: CATS.find(c=>c.id===activeCat).label, filter: v => v.cat === activeCat }];
 
     let shown = 0;
@@ -989,8 +993,6 @@
   });
 
   // ---------- Subscription ----------
-  let USER_ID = storedUser ? storedUser.phone : null;
-  let IS_ADMIN = storedUser ? !!storedUser.isAdmin : false;
   let subscriptionActive = false;
   const subBtn = document.getElementById('subBtn');
   const subModalBackdrop = document.getElementById('subModalBackdrop');
