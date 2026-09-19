@@ -133,8 +133,9 @@
   .sub-modal .qr-links .bank-icon {
     width: 34px; height: 34px; border-radius: 9px; flex: 0 0 34px;
     background: var(--gold); color: #1A130A; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 0.9rem;
+    font-weight: 800; font-size: 0.9rem; object-fit: contain; overflow: hidden;
   }
+  img.bank-icon { background: #fff; padding: 4px; }
   .sub-modal .qr-links .bank-chevron { margin-left: auto; opacity: 0.5; }
   .pay-tabs { display: flex; gap: 6px; background: var(--bg-elev-2); border-radius: 999px; padding: 4px; margin-bottom: 18px; }
   .pay-tab { flex: 1; background: none; border: none; padding: 8px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; color: var(--cream-dim); }
@@ -1140,6 +1141,12 @@
     subPriceLabel.textContent = p ? `${p.price.toLocaleString()}₮ / ${p.label}` : '';
   }
 
+  function makeLetterIcon(name){
+    const span = document.createElement('span');
+    span.className = 'bank-icon';
+    span.textContent = name.trim().charAt(0).toUpperCase();
+    return span;
+  }
   async function openSubModal(){
     subModalBackdrop.classList.add('open');
     switchPayTab('qpay');
@@ -1174,9 +1181,16 @@
         a.href = u.link || u.url || '#';
         a.target = '_blank';
         const name = u.name || u.description || 'Апп нээх';
-        const icon = document.createElement('span');
-        icon.className = 'bank-icon';
-        icon.textContent = name.trim().charAt(0).toUpperCase();
+        let icon;
+        if (u.logo) {
+          icon = document.createElement('img');
+          icon.className = 'bank-icon';
+          icon.src = u.logo;
+          icon.alt = name;
+          icon.onerror = () => { icon.replaceWith(makeLetterIcon(name)); };
+        } else {
+          icon = makeLetterIcon(name);
+        }
         const label = document.createElement('span');
         label.textContent = name;
         const chev = document.createElement('span');
