@@ -96,6 +96,10 @@ function destroyOnBunny(guid){
 }
 
 const app = express();
+// Render sits behind a reverse proxy, so Express needs to trust its
+// X-Forwarded-For header — otherwise express-rate-limit logs a warning
+// (and can't tell users apart) on every single request.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // ---------- Database ----------
