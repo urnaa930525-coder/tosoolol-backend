@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const { Pool } = require('pg');
 const rateLimit = require('express-rate-limit');
@@ -31,8 +32,7 @@ if (!BUNNY_LIBRARY_ID || !BUNNY_API_KEY || !BUNNY_CDN_HOSTNAME) {
   console.error('BUNNY_LIBRARY_ID / BUNNY_API_KEY / BUNNY_CDN_HOSTNAME тохируулаагүй байна — видео upload ажиллахгүй.');
 }
 
-async function uploadVideoToBunny(localPath, title){
-  // 1) Create the video entry
+async function createBunnyVideo(title){
   const createRes = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos`, {
     method: 'POST',
     headers: { 'AccessKey': BUNNY_API_KEY, 'Content-Type': 'application/json' },
@@ -40,9 +40,32 @@ async function uploadVideoToBunny(localPath, title){
   });
   if (!createRes.ok) throw new Error('Bunny video үүсгэхэд алдаа гарлаа: ' + (await createRes.text()));
   const created = await createRes.json();
-  const guid = created.guid;
+  return created.guid;
+}
 
-  // 2) Upload the actual file bytes — stream it rather than reading the
+function bunnyUrls(guid){
+  return {
+    guid,
+    playbackUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/playlist.m3u8`,
+    thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/thumbnail.jpg`
+  };
+}
+
+// TUS (resumable upload protocol) signature, so the BROWSER can upload the
+// video file straight to Bunny's servers — never passing through our own
+// backend at all. This is what makes multi-GB movies work reliably: no
+// relay step, no risk of our small Render instance timing out or running
+// out of memory while shuttling gigabytes of video through itself.
+function bunnyTusSignature(guid, expire){
+  return crypto.createHash('sha256')
+    .update(BUNNY_LIBRARY_ID + BUNNY_API_KEY + expire + guid)
+    .digest('hex');
+}
+
+async function uploadVideoToBunny(localPath, title){
+  const guid = await createBunnyVideo(title);
+
+  // Upload the actual file bytes — stream it rather than reading the
   // whole file into memory first. A full-length movie (1-4GB+) read via
   // fs.readFileSync would exceed Render's free-tier 512MB RAM and crash
   // the process outright (which the browser just sees as "Failed to fetch").
@@ -61,11 +84,7 @@ async function uploadVideoToBunny(localPath, title){
 
   if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
 
-  return {
-    guid,
-    playbackUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/playlist.m3u8`,
-    thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${guid}/thumbnail.jpg`
-  };
+  return bunnyUrls(guid);
 }
 
 function destroyOnBunny(guid){
@@ -538,6 +557,92 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.get('/api/videos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
   res.json(rows.map(videoRowToJson));
+});
+
+// ---------- Direct-to-Bunny upload (recommended for large movies) ----------
+// Step 1: the browser asks us to create a Bunny video entry and gets back a
+// short-lived signed token that lets it push the file straight to Bunny's
+// TUS endpoint — our server is never in the data path for the big upload.
+app.post('/api/upload/init', requireAdmin, async (req, res) => {
+  try {
+    const title = (req.body && req.body.title) || 'Untitled';
+    const guid = await createBunnyVideo(title);
+    const expire = Math.floor(Date.now() / 1000) + 24 * 3600; // 24h to finish uploading
+    const signature = bunnyTusSignature(guid, expire);
+    res.json({
+      videoId: guid,
+      libraryId: BUNNY_LIBRARY_ID,
+      expire,
+      signature,
+      tusEndpoint: 'https://video.bunnycdn.com/tusupload'
+    });
+  } catch (e) {
+    console.error('upload/init failed:', e.message);
+    res.status(500).json({ error: 'Bunny video эхлүүлэхэд алдаа гарлаа: ' + e.message });
+  }
+});
+
+// Step 2: once the browser's direct TUS upload to Bunny finishes, it calls
+// this to save the video's metadata (title/category/etc.) plus any
+// thumbnail/subtitle files, which are small enough to go through us as usual.
+app.post('/api/upload/finalize', requireAdmin, upload.fields([{ name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
+  const subtitleFile = req.files && req.files.subtitle && req.files.subtitle[0];
+  const thumbnailFile = req.files && req.files.thumbnail && req.files.thumbnail[0];
+  const { title, category, description, badge, subtitleLang, bunnyVideoId, size } = req.body;
+
+  if (!title || !category || !bunnyVideoId) {
+    if (subtitleFile && fs.existsSync(subtitleFile.path)) fs.unlinkSync(subtitleFile.path);
+    if (thumbnailFile && fs.existsSync(thumbnailFile.path)) fs.unlinkSync(thumbnailFile.path);
+    return res.status(400).json({ error: 'title, category, bunnyVideoId заавал шаардлагатай.' });
+  }
+
+  try {
+    const bunny = bunnyUrls(bunnyVideoId);
+
+    let subtitleUrl = null;
+    let subtitlePublicId = null;
+    if (subtitleFile) {
+      const ext = path.extname(subtitleFile.originalname).toLowerCase();
+      let vttPath = subtitleFile.path;
+      if (ext !== '.vtt') {
+        const srtContent = fs.readFileSync(subtitleFile.path, 'utf-8');
+        const vttContent = 'WEBVTT\n\n' + srtContent
+          .replace(/\r\n/g, '\n')
+          .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2')
+          .replace(/^(\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3})\s*$/gm, '$1 line:75%');
+        vttPath = subtitleFile.path + '.vtt';
+        fs.writeFileSync(vttPath, vttContent, 'utf-8');
+        fs.unlinkSync(subtitleFile.path);
+      }
+      const subUpload = await uploadToCloudinary(vttPath, { resource_type: 'raw', folder: 'nextkino/subtitles', format: 'vtt' });
+      subtitleUrl = subUpload.secure_url;
+      subtitlePublicId = subUpload.public_id;
+    }
+
+    let thumbnailUrl = bunny.thumbnailUrl;
+    let thumbnailPublicId = null;
+    if (thumbnailFile) {
+      const thumbUpload = await uploadToCloudinary(thumbnailFile.path, { resource_type: 'image', folder: 'nextkino/thumbnails' });
+      thumbnailUrl = thumbUpload.secure_url;
+      thumbnailPublicId = thumbUpload.public_id;
+    }
+
+    const id = Date.now();
+    const { rows } = await pool.query(
+      `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, subtitle_url, subtitle_lang, size, thumbnail_public_id, subtitle_public_id, bunny_video_id, video_provider)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+      [
+        id, title, category, description || '', badge || '',
+        title, bunny.playbackUrl,
+        thumbnailUrl, subtitleUrl, subtitleUrl ? (subtitleLang || 'mn') : null,
+        Number(size) || 0, thumbnailPublicId, subtitlePublicId, bunnyVideoId, 'bunny'
+      ]
+    );
+    res.status(201).json(videoRowToJson(rows[0]));
+  } catch (e) {
+    console.error('finalize failed:', e.message);
+    res.status(500).json({ error: 'Дуусгахад алдаа гарлаа: ' + e.message });
+  }
 });
 
 app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 1 }, { name: 'subtitle', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
