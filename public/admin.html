@@ -22,6 +22,7 @@
   }
 </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
 <body>
   <h1>NextKino — Видео Upload (Admin)</h1>
   <div style="background:#1a2a26; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:0.85rem;">
@@ -59,6 +60,12 @@
     <button type="submit">Upload хийх</button>
   </form>
   <div id="result"></div>
+  <div id="uploadProgressWrap" style="display:none; margin-top:10px;">
+    <div style="background:#1a1a1a; border-radius:6px; overflow:hidden; height:10px;">
+      <div id="uploadProgressBar" style="background:#E3A24B; height:100%; width:0%; transition:width .2s;"></div>
+    </div>
+    <div id="uploadProgressText" style="font-size:0.8rem; color:#9DAEAF; margin-top:4px;"></div>
+  </div>
   <div id="list"></div>
 
   <h3 style="margin-top:40px;">Дансаар шилжүүлсэн хүсэлтүүд</h3>
@@ -192,18 +199,89 @@ async function delVideo(id) {
 }
 window.delVideo = delVideo;
 
+const progressWrap = document.getElementById('uploadProgressWrap');
+const progressBar = document.getElementById('uploadProgressBar');
+const progressText = document.getElementById('uploadProgressText');
+
+function fmtMB(bytes){ return (bytes/1024/1024).toFixed(1) + ' MB'; }
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  result.textContent = 'Uploading...';
+  const videoFile = form.querySelector('input[name="video"]').files[0];
+  if (!videoFile) { result.textContent = 'Видео файл сонгоно уу.'; return; }
+
+  const title = form.querySelector('input[name="title"]').value;
+  const category = form.querySelector('select[name="category"]').value;
+  const description = form.querySelector('textarea[name="description"]').value;
+  const badge = form.querySelector('input[name="badge"]').value;
+  const subtitleLang = form.querySelector('select[name="subtitleLang"]').value;
+  const thumbnailFile = form.querySelector('input[name="thumbnail"]').files[0];
+  const subtitleFile = form.querySelector('input[name="subtitle"]').files[0];
+
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  result.textContent = 'Bunny-д видео бэлдэж байна...';
+
   try {
-    const res = await adminFetch('/api/upload', { method: 'POST', body: new FormData(form) });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Алдаа');
+    // Step 1: ask our server to create the Bunny video entry + get a
+    // signed token for a direct browser -> Bunny upload.
+    const initRes = await adminFetch('/api/upload/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    });
+    const init = await initRes.json();
+    if (!initRes.ok) throw new Error(init.error || 'Эхлүүлэхэд алдаа гарлаа');
+
+    // Step 2: upload the video file straight to Bunny — this never touches
+    // our Render server, so file size/timeouts on our side don't matter.
+    await new Promise((resolve, reject) => {
+      const upload = new tus.Upload(videoFile, {
+        endpoint: init.tusEndpoint,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          AuthorizationSignature: init.signature,
+          AuthorizationExpire: String(init.expire),
+          VideoId: init.videoId,
+          LibraryId: String(init.libraryId)
+        },
+        metadata: { filetype: videoFile.type, title },
+        onError: reject,
+        onProgress: (uploaded, total) => {
+          const pct = Math.round((uploaded / total) * 100);
+          progressBar.style.width = pct + '%';
+          progressText.textContent = `${pct}% — ${fmtMB(uploaded)} / ${fmtMB(total)}`;
+        },
+        onSuccess: resolve
+      });
+      upload.start();
+    });
+
+    // Step 3: video bytes are on Bunny now — save the metadata + optional
+    // thumbnail/subtitle (small files, fine to send through our server).
+    result.textContent = 'Дуусгаж байна...';
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('category', category);
+    fd.append('description', description);
+    fd.append('badge', badge);
+    fd.append('subtitleLang', subtitleLang);
+    fd.append('bunnyVideoId', init.videoId);
+    fd.append('size', String(videoFile.size));
+    if (thumbnailFile) fd.append('thumbnail', thumbnailFile);
+    if (subtitleFile) fd.append('subtitle', subtitleFile);
+
+    const finalRes = await adminFetch('/api/upload/finalize', { method: 'POST', body: fd });
+    const data = await finalRes.json();
+    if (!finalRes.ok) throw new Error(data.error || 'Алдаа');
+
     result.textContent = 'Амжилттай! ID: ' + data.id + '\nURL: ' + data.url;
     form.reset();
+    progressWrap.style.display = 'none';
     loadVideos();
   } catch (err) {
     result.textContent = 'Алдаа: ' + err.message;
+    progressWrap.style.display = 'none';
   }
 });
 
