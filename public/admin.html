@@ -23,6 +23,7 @@
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/tus-js-client@4/dist/tus.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 <body>
   <h1>NextKino — Видео Upload (Admin)</h1>
   <div style="background:#1a2a26; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:0.85rem;">
@@ -144,12 +145,22 @@ function togglePreview(id) {
   const v = window._videos.find(x => x.id === id);
 
   const video = document.createElement('video');
-  video.src = v.url;
   if (v.thumbnailUrl) video.poster = v.thumbnailUrl;
   video.controls = true;
   video.style.maxWidth = '100%';
   video.style.maxHeight = '400px';
   video.style.background = '#000';
+
+  const isHls = /\.m3u8($|\?)/.test(v.url);
+  if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = v.url;
+  } else if (isHls && window.Hls && window.Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(v.url);
+    hls.attachMedia(video);
+  } else {
+    video.src = v.url;
+  }
 
   if (v.subtitleUrl) {
     const track = document.createElement('track');
