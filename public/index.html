@@ -243,6 +243,19 @@
   .row-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
   .row-head h3 { font-size: 1.1rem; font-weight: 600; margin: 0; }
   .row-head span { color: var(--cream-dim); font-size: 0.82rem; }
+  .row-scroll-wrap { position: relative; }
+  .row-arrow {
+    position: absolute; top: 0; bottom: 8px; z-index: 4;
+    width: 40px; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+    color: var(--cream); opacity: 0; transition: opacity 0.15s;
+  }
+  .row-scroll-wrap:hover .row-arrow { opacity: 1; }
+  .row-arrow.prev { left: 0; }
+  .row-arrow.next { right: 0; background: linear-gradient(to left, var(--bg) 0%, transparent 100%); }
+  .row-arrow svg { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
+  @media (hover: none) { .row-arrow { display: none; } }
   .grid-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
   .grid-row::-webkit-scrollbar { height: 6px; }
   .grid-row::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
@@ -665,8 +678,13 @@
       shown += vids.length;
       const row = document.createElement('div');
       row.className = 'row';
-      row.innerHTML = `<div class="row-head"><h3>${def.label}</h3><span>${vids.length}</span></div><div class="grid-row"></div>`;
+      row.innerHTML = `<div class="row-head"><h3>${def.label}</h3><span>${vids.length}</span></div><div class="row-scroll-wrap"><button class="row-arrow prev" aria-label="Өмнөх"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button><div class="grid-row"></div><button class="row-arrow next" aria-label="Дараах"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button></div>`;
       const grid = row.querySelector('.grid-row');
+      const prevBtn = row.querySelector('.row-arrow.prev');
+      const nextBtn = row.querySelector('.row-arrow.next');
+      const scrollByAmount = () => Math.max(grid.clientWidth * 0.85, 300);
+      prevBtn.addEventListener('click', () => grid.scrollBy({ left: -scrollByAmount(), behavior: 'smooth' }));
+      nextBtn.addEventListener('click', () => grid.scrollBy({ left: scrollByAmount(), behavior: 'smooth' }));
       vids.forEach(v => {
         const isFav = favs.includes(v.id);
         const p = document.createElement('div');
