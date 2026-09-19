@@ -278,7 +278,16 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  // HTML files change often (we redeploy frequently) and some in-app
+  // browsers (Messenger, etc.) cache pages aggressively — force those to
+  // always revalidate so people don't get stuck on a stale UI.
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // ---------- Storage config ----------
 const storage = multer.diskStorage({
