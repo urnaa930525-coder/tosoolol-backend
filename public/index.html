@@ -122,8 +122,20 @@
   .sub-modal .qr-wrap { background: #fff; border-radius: 14px; padding: 14px; margin: 0 auto 16px; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; }
   .sub-modal .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
   .sub-modal .qr-status { color: var(--cream-dim); font-size: 0.85rem; margin-bottom: 10px; }
-  .sub-modal .qr-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-  .sub-modal .qr-links a { font-size: 0.78rem; color: var(--gold); text-decoration: underline; }
+  .sub-modal .qr-links { display: flex; flex-direction: column; gap: 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); margin-top: 4px; }
+  .sub-modal .qr-links a {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    font-size: 0.86rem; font-weight: 600; color: var(--cream); text-decoration: none;
+    border-bottom: 1px solid var(--line); background: var(--bg-elev);
+  }
+  .sub-modal .qr-links a:last-child { border-bottom: none; }
+  .sub-modal .qr-links a:hover { background: var(--bg-elev-2); }
+  .sub-modal .qr-links .bank-icon {
+    width: 34px; height: 34px; border-radius: 9px; flex: 0 0 34px;
+    background: var(--gold); color: #1A130A; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.9rem;
+  }
+  .sub-modal .qr-links .bank-chevron { margin-left: auto; opacity: 0.5; }
   .pay-tabs { display: flex; gap: 6px; background: var(--bg-elev-2); border-radius: 999px; padding: 4px; margin-bottom: 18px; }
   .pay-tab { flex: 1; background: none; border: none; padding: 8px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; color: var(--cream-dim); }
   .pay-tab.active { background: var(--gold); color: #1A130A; }
@@ -755,7 +767,6 @@
 
   function openPlayer(id){
     if (!USER_ID) { showEntryOverlay(); return; }
-    if (!subscriptionActive && !IS_ADMIN) { openSubModal(); return; }
     curVideo = allVideos().find(v => v.id === id);
     document.getElementById('modalTitle').textContent = curVideo.title;
     document.getElementById('modalDesc').textContent = curVideo.desc;
@@ -840,6 +851,30 @@
       playerArt.innerHTML = '';
       playerArt.appendChild(wrap);
 
+      // ---- Free preview: first 8 minutes play for everyone; after that,
+      // non-subscribers get paused and shown the payment QR. ----
+      const FREE_PREVIEW_SECONDS = 8 * 60;
+      let paywallShown = false;
+      function enforcePaywall(){
+        if (subscriptionActive || IS_ADMIN) return;
+        if (video.currentTime >= FREE_PREVIEW_SECONDS) {
+          video.pause();
+          video.currentTime = FREE_PREVIEW_SECONDS;
+          if (!paywallShown) {
+            paywallShown = true;
+            pendingResumeVideo = video;
+            openSubModal();
+          }
+        }
+      }
+      video.addEventListener('timeupdate', enforcePaywall);
+      video.addEventListener('play', enforcePaywall);
+      video.addEventListener('seeking', () => {
+        if (!subscriptionActive && !IS_ADMIN && video.currentTime > FREE_PREVIEW_SECONDS) {
+          video.currentTime = FREE_PREVIEW_SECONDS;
+        }
+      });
+
       // Some browsers don't reliably reflow a <video> to its real size once
       // metadata loads (it can stay collapsed until fullscreen forces a
       // layout pass). Set explicit pixel dimensions ourselves so the video
@@ -887,7 +922,7 @@
       setPlaying(true);
     }
   }
-  function closePlayer(){ backdrop.classList.remove('open'); listMenu.classList.remove('open'); setPlaying(false); clearInterval(timer); playerArt.innerHTML = ''; }
+  function closePlayer(){ backdrop.classList.remove('open'); listMenu.classList.remove('open'); setPlaying(false); clearInterval(timer); playerArt.innerHTML = ''; pendingResumeVideo = null; }
   function setPlaying(p){
     playing = p; updatePlayUI(); clearInterval(timer);
     if (playing) timer = setInterval(() => {
@@ -994,6 +1029,7 @@
 
   // ---------- Subscription ----------
   let subscriptionActive = false;
+  let pendingResumeVideo = null;
   const subBtn = document.getElementById('subBtn');
   const subModalBackdrop = document.getElementById('subModalBackdrop');
   const subQrImg = document.getElementById('subQrImg');
@@ -1135,7 +1171,18 @@
       subStatusText.textContent = 'QPay аппликейшнаар уншуулж төлнө үү…';
       (data.urls || []).forEach(u => {
         const a = document.createElement('a');
-        a.href = u.link || u.url || '#'; a.textContent = u.name || u.description || 'Апп нээх'; a.target = '_blank';
+        a.href = u.link || u.url || '#';
+        a.target = '_blank';
+        const name = u.name || u.description || 'Апп нээх';
+        const icon = document.createElement('span');
+        icon.className = 'bank-icon';
+        icon.textContent = name.trim().charAt(0).toUpperCase();
+        const label = document.createElement('span');
+        label.textContent = name;
+        const chev = document.createElement('span');
+        chev.className = 'bank-chevron';
+        chev.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+        a.appendChild(icon); a.appendChild(label); a.appendChild(chev);
         subLinks.appendChild(a);
       });
       clearInterval(subPollTimer);
@@ -1144,7 +1191,13 @@
         if (active) {
           clearInterval(subPollTimer);
           subStatusText.textContent = 'Амжилттай төлөгдлөө! 🎉';
-          setTimeout(() => subModalBackdrop.classList.remove('open'), 1200);
+          setTimeout(() => {
+            subModalBackdrop.classList.remove('open');
+            if (pendingResumeVideo) {
+              pendingResumeVideo.play().catch(() => {});
+              pendingResumeVideo = null;
+            }
+          }, 1200);
         }
       }, 3000);
     } catch (e) {
