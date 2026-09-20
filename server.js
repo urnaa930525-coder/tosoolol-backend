@@ -245,7 +245,7 @@ function requireAdmin(req, res, next) {
 }
 
 // ---------- CORS: only allow the site's own origin(s) to call the API ----------
-const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || 'https://tosoolol-backend.onrender.com')
+const ALLOWED_ORIGINS = String(process.env.ALLOWED_ORIGINS || 'https://tosoolol-backend.onrender.com,https://nextkino.live,https://www.nextkino.live')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
