@@ -436,6 +436,29 @@
     width: 34px; height: 34px; border-radius: 50%; border: none;
     background: rgba(10,14,12,0.55); color: #F2ECE0; display: flex; align-items: center; justify-content: center;
   }
+
+  /* ===== Шинэ дизайн: харанхуй хөх (TV streaming хэв маяг) ===== */
+  :root {
+    --bg:#0a1020; --sidebar:#080d1c; --bg-elev:#101a3399; --bg-elev-2:#16213f;
+    --gold:#5b8def; --gold-dim:#3a5fb0; --rose:#8fb2ff; --teal:#3a5fb0; --violet:#5b8def;
+    --cream:#eef3ff; --cream-dim:#93a1c4; --line:rgba(200,215,255,0.10);
+    --c-ai:#6fa3ff; --c-movie:#5b8def; --c-series:#3f6fd1; --c-show:#9bbcff;
+  }
+  body { background: radial-gradient(1200px 600px at 70% -10%, #15244d 0%, var(--bg) 60%); }
+  .tagline-title { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
+  .hero { min-height: 340px; }
+  .hero-scrim { background: linear-gradient(90deg, #0a1020 0%, rgba(10,16,32,.78) 38%, rgba(10,16,32,0) 75%), linear-gradient(0deg, #0a1020 0%, rgba(10,16,32,0) 45%) !important; }
+  .btn-play { background: rgba(255,255,255,.92); color: #0a1020; border-radius: 6px; }
+  .btn-ghost { border-radius: 6px; }
+  /* Landscape (16:9) картууд */
+  .poster { aspect-ratio: 16 / 9; flex: 0 0 270px; border-radius: 10px; border: 1px solid var(--line); }
+  .poster:hover { transform: translateY(-4px) scale(1.02); border-color: rgba(143,178,255,.55); }
+  .detail-related .poster { flex: 0 0 210px; }
+  .detail-tag { background: transparent; border: 1px solid rgba(255,255,255,.35); color: #e6edff; border-radius: 4px; }
+  .detail-tag.adult { background: var(--c-adult); border-color: var(--c-adult); }
+  .d-sec.on { background: rgba(91,141,239,.4); }
+  .d-play { border-radius: 6px; } .detail-actions button { border-radius: 6px; }
+  .adult-ok { background: linear-gradient(135deg, var(--c-adult), #5b8def); }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
