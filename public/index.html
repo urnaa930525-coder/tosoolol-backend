@@ -437,6 +437,12 @@
     background: rgba(10,14,12,0.55); color: #F2ECE0; display: flex; align-items: center; justify-content: center;
   }
 
+  .sub-modal { max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; }
+  .sub-modal .qr-links { max-height: 260px; overflow-y: auto; }
+  .sub-back { position: sticky; top: -28px; z-index: 2; background: #0f1830; padding: 8px 0 !important; width: 100%; text-align: left; }
+  .sub-modal-close { z-index: 3; }
+  .sub-back { background: #0f1830; border: none; color: var(--cream-dim); cursor: pointer; font-size: .85rem; padding: 0; margin-bottom: 8px; }
+  .sub-back:hover { color: var(--cream); }
   /* ===== Шинэ дизайн: харанхуй хөх (TV streaming хэв маяг) ===== */
   :root {
     --bg:#0a1020; --sidebar:#080d1c; --bg-elev:#101a3399; --bg-elev-2:#16213f;
@@ -533,7 +539,7 @@
     <div class="nav-divider"></div>
     <div class="nav-group">
       <button class="nav-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>Бидний тухай</button>
-      <button class="nav-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Эрх нээлгэх</button>
+      <button class="nav-item" id="sideSubBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Эрх нээлгэх</button>
     </div>
   </aside>
 
@@ -654,7 +660,13 @@
   <div class="sub-modal">
     <button class="sub-modal-close" id="subModalClose"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
     <h3>Гишүүнчлэл авах</h3>
-    <div class="plan-tabs" id="planTabs"></div>
+    <div id="planStep">
+      <div class="qr-status" style="margin-bottom:12px;">1-р алхам: Гишүүнчлэлийн хугацаагаа сонгоно уу</div>
+      <div class="plan-tabs" id="planTabs"></div>
+      <button class="bank-confirm-btn" id="planContinue" style="margin-top:16px;">Үргэлжлүүлэх →</button>
+    </div>
+    <div id="payStep" style="display:none;">
+    <button type="button" class="sub-back" id="planBack">← Багц солих</button>
     <div class="price" id="subPriceLabel">Ачаалж байна…</div>
     <div class="pay-tabs">
       <button class="pay-tab active" id="tabQpay">QPay-р төлөх</button>
@@ -669,6 +681,7 @@
       <div class="bank-info" id="bankInfoBox">Ачаалж байна…</div>
       <button class="bank-confirm-btn" id="bankConfirmBtn">Шилжүүлсэн</button>
       <div class="qr-status" id="bankStatusText"></div>
+    </div>
     </div>
   </div>
 </div>
@@ -1450,7 +1463,6 @@
         planTabsEl.querySelectorAll('.plan-tab').forEach(b => b.classList.toggle('active', b === btn));
         updatePriceLabel(plans);
         renderBankAmount();
-        openSubModal(); // re-create the QPay invoice for the newly selected plan
       });
     });
   }
@@ -1465,7 +1477,27 @@
     span.textContent = name.trim().charAt(0).toUpperCase();
     return span;
   }
+  const planStepEl = document.getElementById('planStep');
+  const payStepEl = document.getElementById('payStep');
+  // 1-р алхам: багц сонгох
   async function openSubModal(){
+    clearInterval(subPollTimer);
+    subModalBackdrop.classList.add('open');
+    planStepEl.style.display = '';
+    payStepEl.style.display = 'none';
+    if (!plansLoaded) {
+      try {
+        const res = await fetch('/api/subscribe/bank-info');
+        const data = await res.json();
+        bankInfoStatic = data;
+        renderPlanTabs(data.plans);
+      } catch (e) { planTabsEl.textContent = 'Багцын мэдээлэл ачаалж чадсангүй.'; }
+    }
+  }
+  // 2-р алхам: сонгосон багцаар төлбөр (QPay invoice) үүсгэх
+  async function startPayment(){
+    planStepEl.style.display = 'none';
+    payStepEl.style.display = '';
     subModalBackdrop.classList.add('open');
     switchPayTab('qpay');
     bankStatusText.textContent = '';
@@ -1497,7 +1529,8 @@
       (data.urls || []).forEach(u => {
         const a = document.createElement('a');
         a.href = u.link || u.url || '#';
-        a.target = '_blank';
+        // банкны апп-ын deeplink (khanbank:// гэх мэт) шинэ табд нээгдэхгүй, шууд апп руу шилжинэ
+        if (/^https?:/i.test(a.href)) { a.target = '_blank'; a.rel = 'noopener'; }
         const name = u.name || u.description || 'Апп нээх';
         let icon;
         if (u.logo) {
@@ -1536,9 +1569,15 @@
       subStatusText.textContent = 'Сүлжээний алдаа гарлаа.';
     }
   }
+  document.getElementById('planContinue').addEventListener('click', startPayment);
+  document.getElementById('planBack').addEventListener('click', openSubModal);
   subBtn.addEventListener('click', () => {
     if (!USER_ID) { showEntryOverlay(); return; }
     if (!subscriptionActive) openSubModal();
+  });
+  document.getElementById('sideSubBtn').addEventListener('click', () => {
+    subBtn.click(); // топбар дахь «Гишүүнчлэл» товчтой ижил: нэвтрээгүй бол бүртгэл, эс бөгөөс төлбөрийн сонголт
+    if (window.innerWidth <= 880) sidebar.classList.remove('open');
   });
   document.getElementById('subModalClose').addEventListener('click', () => {
     subModalBackdrop.classList.remove('open');
