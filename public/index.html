@@ -25,8 +25,53 @@
     --c-movie: #6C5DD3;
     --c-series: #4B3F92;
     --c-show: #A99BE8;
+    --c-adult: #D6336C;
   }
   :root { color-scheme: dark; }
+  /* ---------- Movie detail page ---------- */
+  .detail { position: fixed; inset: 0; z-index: 90; background: #060818; display: none; overflow-y: auto; }
+  .detail.open { display: block; }
+  .detail-bg { position: absolute; top: 0; left: 0; right: 0; height: 78vh; overflow: hidden; }
+  .detail-bg img, .detail-bg svg { width: 100%; height: 100%; object-fit: cover; filter: blur(2px) brightness(.55); transform: scale(1.04); }
+  .detail-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6,8,24,.25) 0%, rgba(6,8,24,.75) 60%, #060818 100%), linear-gradient(90deg, #060818 0%, rgba(6,8,24,0) 65%); }
+  .detail-inner { position: relative; max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+  .detail-back { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08); border: 1px solid var(--line); color: var(--cream); padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: .85rem; backdrop-filter: blur(6px); }
+  .detail-back:hover { background: rgba(255,255,255,.16); }
+  .detail-head { display: flex; gap: 32px; margin-top: 56px; align-items: flex-end; }
+  .detail-poster { flex: 0 0 210px; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.6); border: 1px solid var(--line); }
+  .detail-poster img, .detail-poster svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .detail-info { flex: 1; min-width: 0; }
+  .detail-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .detail-tag { font-size: .72rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: rgba(108,93,211,.28); color: #cfc8ff; letter-spacing: .04em; }
+  .detail-tag.adult { background: var(--c-adult); color: #fff; }
+  .detail-title { font-family: 'Fraunces', serif; font-weight: 700; font-size: clamp(1.9rem, 5vw, 3.4rem); line-height: 1.08; margin: 0 0 14px; color: #fff; }
+  .detail-desc { color: #c9c6e4; line-height: 1.7; font-size: .95rem; max-width: 640px; margin: 0 0 22px; }
+  .detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .detail-actions button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 999px; border: none; font-weight: 700; font-size: .92rem; cursor: pointer; }
+  .d-play { background: #fff; color: #0A0E27; }
+  .d-sec { background: rgba(255,255,255,.1); color: var(--cream); border: 1px solid var(--line) !important; }
+  .d-sec.on { background: rgba(108,93,211,.45); }
+  .detail-section { margin-top: 44px; }
+  .detail-section h3 { font-family: 'Fraunces', serif; font-size: 1.1rem; margin: 0 0 14px; color: var(--cream); }
+  .detail-related { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  .detail-related .poster { flex: 0 0 140px; }
+  @media (max-width: 720px) {
+    .detail-head { flex-direction: column; align-items: flex-start; gap: 20px; margin-top: 36px; }
+    .detail-poster { flex-basis: auto; width: 150px; }
+    .detail-bg { height: 55vh; }
+  }
+  /* ---------- 18+ gate ---------- */
+  .adult-gate { position: fixed; inset: 0; background: rgba(5,7,20,.88); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 200; }
+  .adult-gate.open { display: flex; }
+  .adult-box { background: #12163f; border: 1px solid var(--line); border-radius: 16px; padding: 26px; max-width: 400px; width: 100%; text-align: center; }
+  .adult-box h2 { font-family: 'Fraunces', serif; font-size: 1.4rem; margin: 0 0 8px; color: var(--cream); }
+  .adult-box p { color: #B8B5D8; font-size: .9rem; line-height: 1.6; margin: 0 0 14px; }
+  .adult-box input[type=date] { width: 100%; padding: 11px; border-radius: 10px; border: 1px solid var(--line); background: #0A0E27; color: var(--cream); margin-bottom: 8px; color-scheme: dark; }
+  .adult-err { color: #ff7b8f; font-size: .82rem; min-height: 20px; margin-bottom: 6px; }
+  .adult-row { display: flex; gap: 10px; }
+  .adult-row button { flex: 1; padding: 11px; border-radius: 999px; border: none; font-weight: 700; color: #fff; cursor: pointer; }
+  .adult-ok { background: linear-gradient(135deg, var(--c-adult), var(--violet)); }
+  .adult-cancel { background: #2a2f5c; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -424,6 +469,41 @@
 </div>
 
 <div class="app">
+  <div class="detail" id="detail">
+    <div class="detail-bg" id="detailBg"></div>
+    <div class="detail-inner">
+      <button class="detail-back" id="detailBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Буцах</button>
+      <div class="detail-head">
+        <div class="detail-poster" id="detailPoster"></div>
+        <div class="detail-info">
+          <div class="detail-tags" id="detailTags"></div>
+          <h2 class="detail-title" id="detailTitle"></h2>
+          <p class="detail-desc" id="detailDesc"></p>
+          <div class="detail-actions">
+            <button class="d-play" id="dPlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>Үзэх</button>
+            <button class="d-sec" id="dFav">♡ Таалагдсан</button>
+            <button class="d-sec" id="dLater">Дараа үзэх</button>
+          </div>
+        </div>
+      </div>
+      <div class="detail-section" id="detailRelatedWrap">
+        <h3>Төстэй контент</h3>
+        <div class="detail-related" id="detailRelated"></div>
+      </div>
+    </div>
+  </div>
+  <div class="adult-gate" id="adultGate">
+    <div class="adult-box">
+      <h2>🔞 Насанд хүрэгчдэд зориулав</h2>
+      <p>Энэ хэсэг нь 18 ба түүнээс дээш насныханд зориулагдсан (айдас, хүчирхийлэл агуулсан кино). Үргэлжлүүлэхийн тулд төрсөн огноогоо оруулна уу.</p>
+      <input type="date" id="adultDob">
+      <div class="adult-err" id="adultErr"></div>
+      <div class="adult-row">
+        <button class="adult-cancel" id="adultCancel">Буцах</button>
+        <button class="adult-ok" id="adultConfirm">Баталгаажуулах</button>
+      </div>
+    </div>
+  </div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <div class="nav-group" id="mainNav"></div>
@@ -583,6 +663,7 @@
     { id:'movie', label:'Кино', icon:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 9l4-2v10l-4-2"/>' },
     { id:'show', label:'Нэвтрүүлэг', icon:'<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.4"/>' },
     { id:'ai', label:'AI кино', icon:'<path d="M12 3l2.2 4.9L19 10l-4.8 2.1L12 17l-2.2-4.9L5 10l4.8-2.1z"/>' },
+    { id:'adult', label:'Насанд хүрэгчдэд 18+', icon:'<circle cx="12" cy="12" r="9"/><path d="M8 15V9l-1.5 1M13 9h2a1.5 1.5 0 0 1 0 3h-2h2a1.5 1.5 0 0 1 0 3h-2z"/>' },
     { id:'fav', label:'Таалагдсан', icon:'<path d="M12 21s-7-4.5-9.5-9C.5 8 2 4 6 4c2 0 3.5 1.2 4 2.2C10.5 5.2 12 4 14 4c4 0 5.5 4 3.5 8-2.5 4.5-9.5 9-9.5 9z"/>' },
     { id:'later', label:'Дараа үзэх', icon:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>' },
     { id:'history', label:'Үзсэн түүх', icon:'<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/>' }
@@ -602,7 +683,7 @@
         sub: CATS.find(c => c.id === v.category)?.label || v.category,
         title: v.title,
         desc: v.description || '',
-        badge: v.badge || '',
+        badge: v.category === 'adult' ? '18+' : (v.badge || ''),
         dur: 0,
         hue: (v.id % 360),
         videoUrl: API_BASE + v.url,
@@ -651,6 +732,42 @@
     </svg>`;
   }
 
+  // ---------- 18+ age verification ----------
+  const ADULT_TTL = 30 * 24 * 3600 * 1000; // 30 хоног
+  function adultKey(){ return 'nextkino_adult_' + (USER_ID || 'guest'); }
+  function isAdultVerified(){
+    try {
+      const o = JSON.parse(localStorage.getItem(adultKey()) || 'null');
+      return !!o && o.ok === true && (Date.now() - o.at) < ADULT_TTL;
+    } catch(e){ return false; }
+  }
+  function ageFromDob(str){
+    const d = new Date(str), n = new Date();
+    let a = n.getFullYear() - d.getFullYear();
+    const m = n.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+    return a;
+  }
+  let adultCb = null;
+  function askAdult(cb){
+    adultCb = cb;
+    document.getElementById('adultErr').textContent = '';
+    document.getElementById('adultGate').classList.add('open');
+  }
+  document.getElementById('adultCancel').onclick = () => { adultCb = null; document.getElementById('adultGate').classList.remove('open'); };
+  document.getElementById('adultConfirm').onclick = () => {
+    const v = document.getElementById('adultDob').value;
+    const err = document.getElementById('adultErr');
+    if (!v) { err.textContent = 'Төрсөн огноогоо оруулна уу.'; return; }
+    const age = ageFromDob(v);
+    if (isNaN(age) || age < 0 || age > 120) { err.textContent = 'Огноо буруу байна.'; return; }
+    if (age < 18) { err.textContent = 'Уучлаарай, энэ хэсэг 18 нас хүрсэн хүмүүст зориулагдсан.'; return; }
+    try { localStorage.setItem(adultKey(), JSON.stringify({ ok:true, at: Date.now() })); } catch(e){}
+    document.getElementById('adultGate').classList.remove('open');
+    const cb = adultCb; adultCb = null;
+    if (cb) cb();
+  };
+
   // ---------- Sidebar nav ----------
   const mainNav = document.getElementById('mainNav');
   let activeCat = 'all';
@@ -659,7 +776,11 @@
     b.className = 'nav-item' + (c.id === 'all' ? ' active' : '');
     b.dataset.cat = c.id;
     b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${c.icon}</svg>${c.label}`;
-    b.onclick = () => { activeCat = c.id; [...mainNav.children].forEach(x => x.classList.toggle('active', x === b)); render(); if (window.innerWidth <= 880) sidebar.classList.remove('open'); };
+    const selectCat = () => { activeCat = c.id; [...mainNav.children].forEach(x => x.classList.toggle('active', x === b)); render(); if (window.innerWidth <= 880) sidebar.classList.remove('open'); };
+    b.onclick = () => {
+      if (c.id === 'adult' && !isAdultVerified()) { askAdult(selectCat); return; }
+      selectCat();
+    };
     mainNav.appendChild(b);
   });
   const sidebar = document.getElementById('sidebar');
@@ -667,7 +788,8 @@
 
   // ---------- Hero ----------
   function renderHero(){
-    const latestUpload = uploadedVideos.length ? uploadedVideos[uploadedVideos.length - 1] : null;
+    const heroPool = uploadedVideos.filter(x => x.cat !== 'adult');
+    const latestUpload = heroPool.length ? heroPool[heroPool.length - 1] : null;
     const v = latestUpload || VIDEOS[4];
     const heroEl = document.getElementById('hero');
     if (!v) { heroEl.style.display = 'none'; return; }
@@ -678,7 +800,7 @@
     document.getElementById('heroTitle').textContent = v.title;
     document.getElementById('heroDesc').textContent = v.desc;
     document.getElementById('heroPlay').onclick = () => openPlayer(v.id);
-    document.getElementById('heroInfo').onclick = () => openPlayer(v.id);
+    document.getElementById('heroInfo').onclick = () => openDetail(v.id);
   }
   renderHero();
 
@@ -709,7 +831,7 @@
 
     let shown = 0;
     defs.forEach(def => {
-      let vids = allVideos().filter(def.filter);
+      let vids = allVideos().filter(def.filter).filter(v => v.cat !== 'adult' || activeCat === 'adult');
       if (q) vids = vids.filter(v => v.title.toLowerCase().includes(q) || v.desc.toLowerCase().includes(q));
       if (!vids.length) return;
       shown += vids.length;
@@ -726,7 +848,7 @@
         const isFav = favs.includes(v.id);
         const p = document.createElement('div');
         p.className = 'poster';
-        const badgeColor = { ai:'var(--c-ai)', movie:'var(--c-movie)', series:'var(--c-series)', show:'var(--c-show)' }[v.cat] || 'var(--gold)';
+        const badgeColor = { ai:'var(--c-ai)', movie:'var(--c-movie)', series:'var(--c-series)', show:'var(--c-show)', adult:'var(--c-adult)' }[v.cat] || 'var(--gold)';
         p.innerHTML = `
           ${v.thumbnailUrl ? `<img src="${v.thumbnailUrl}" alt="">` : artSVG(v)}
           <div class="poster-scrim"></div>
@@ -735,7 +857,7 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="${isFav?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C.5 8 2 4 6 4c2 0 3.5 1.2 4 2.2C10.5 5.2 12 4 14 4c4 0 5.5 4 3.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
           </button>
           <div class="poster-title">${v.title}</div>`;
-        p.addEventListener('click', (e) => { if (e.target.closest('.poster-fav')) return; openPlayer(v.id); });
+        p.addEventListener('click', (e) => { if (e.target.closest('.poster-fav')) return; openDetail(v.id); });
         p.querySelector('.poster-fav').addEventListener('click', (e) => {
           e.stopPropagation();
           const btn = e.currentTarget;
@@ -788,9 +910,73 @@
   function iconPause(){ return '<svg width="26" height="26" viewBox="0 0 24 24" fill="#F2ECE0"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'; }
   function smallIcon(p){ return p ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg>'; }
 
+  // ---------- Movie detail page ----------
+  const detailEl = document.getElementById('detail');
+  let detailId = null;
+  function catLabel(v){ const c = CATS.find(x => x.id === v.cat); return c ? c.label : (v.sub || ''); }
+  function paintDetailButtons(){
+    const v = allVideos().find(x => x.id === detailId); if (!v) return;
+    const fav = getFavs().includes(v.id);
+    const later = getStatuses()[v.id] === 'later';
+    const f = document.getElementById('dFav'), l = document.getElementById('dLater');
+    f.textContent = (fav ? '♥ ' : '♡ ') + 'Таалагдсан'; f.classList.toggle('on', fav);
+    l.textContent = later ? '✓ Дараа үзэх' : 'Дараа үзэх'; l.classList.toggle('on', later);
+  }
+  function openDetail(id, fromPop){
+    const v = allVideos().find(x => x.id === id); if (!v) return;
+    if (v.cat === 'adult' && !isAdultVerified()) { askAdult(() => openDetail(id)); return; }
+    detailId = id;
+    const art = v.thumbnailUrl
+      ? `<img src="${v.thumbnailUrl}" alt="" onerror="this.style.display='none'">`
+      : artSVG(v, true);
+    document.getElementById('detailBg').innerHTML = (v.thumbnailUrl ? art : '') + (v.thumbnailUrl ? '' : artSVG(v, true));
+    document.getElementById('detailPoster').innerHTML = v.thumbnailUrl ? art : artSVG(v);
+    const tags = document.getElementById('detailTags'); tags.innerHTML = '';
+    const addTag = (t, cls) => { if (!t) return; const e = document.createElement('span'); e.className = 'detail-tag' + (cls ? ' ' + cls : ''); e.textContent = t; tags.appendChild(e); };
+    addTag(catLabel(v), v.cat === 'adult' ? 'adult' : '');
+    if (v.cat === 'adult') addTag('18+', 'adult');
+    else if (v.badge) addTag(v.badge);
+    document.getElementById('detailTitle').textContent = v.title;
+    document.getElementById('detailDesc').textContent = v.desc || 'Тайлбар оруулаагүй байна.';
+    paintDetailButtons();
+
+    // Related: same category, excluding adult unless we're inside adult
+    const rel = allVideos().filter(x => x.id !== v.id && x.cat === v.cat).slice(0, 12);
+    const relWrap = document.getElementById('detailRelatedWrap'), relEl = document.getElementById('detailRelated');
+    relEl.innerHTML = '';
+    relWrap.style.display = rel.length ? '' : 'none';
+    rel.forEach(r => {
+      const d = document.createElement('div'); d.className = 'poster';
+      d.innerHTML = (r.thumbnailUrl ? `<img src="${r.thumbnailUrl}" alt="" onerror="this.style.display='none'">` : artSVG(r)) + '<div class="poster-scrim"></div><div class="poster-title"></div>';
+      d.querySelector('.poster-title').textContent = r.title;
+      d.addEventListener('click', () => { detailEl.scrollTop = 0; openDetail(r.id, true); });
+      relEl.appendChild(d);
+    });
+
+    const wasOpen = detailEl.classList.contains('open');
+    detailEl.classList.add('open');
+    detailEl.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    if (!wasOpen && !fromPop) { try { history.pushState({ detail: 1 }, ''); } catch(e){} }
+  }
+  function closeDetail(fromPop){
+    if (!detailEl.classList.contains('open')) return;
+    detailEl.classList.remove('open');
+    document.body.style.overflow = '';
+    detailId = null;
+    if (!fromPop && history.state && history.state.detail) { try { history.back(); } catch(e){} }
+  }
+  document.getElementById('detailBack').onclick = () => closeDetail();
+  window.addEventListener('popstate', () => closeDetail(true));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !backdrop.classList.contains('open')) closeDetail(); });
+  document.getElementById('dPlay').onclick = () => { if (detailId) openPlayer(detailId); };
+  document.getElementById('dFav').onclick = () => { if (detailId) { toggleFav(detailId); paintDetailButtons(); render(); } };
+  document.getElementById('dLater').onclick = () => { if (detailId) { setStatus(detailId, 'later'); paintDetailButtons(); } };
+
   function openPlayer(id){
     if (!USER_ID) { showEntryOverlay(); return; }
     curVideo = allVideos().find(v => v.id === id);
+    if (curVideo && curVideo.cat === 'adult' && !isAdultVerified()) { askAdult(() => openPlayer(id)); return; }
     document.getElementById('modalTitle').textContent = curVideo.title;
     document.getElementById('modalDesc').textContent = curVideo.desc;
     refreshListMenu();
