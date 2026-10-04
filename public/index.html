@@ -771,7 +771,9 @@
   // ---------- Sidebar nav ----------
   const mainNav = document.getElementById('mainNav');
   let activeCat = 'all';
+  const HIDDEN_NAV = ['movie', 'show']; // sidebar-аас нууж буй ангилал (өгөгдөл хэвээр)
   CATS.forEach(c => {
+    if (HIDDEN_NAV.includes(c.id)) return;
     const b = document.createElement('button');
     b.className = 'nav-item' + (c.id === 'all' ? ' active' : '');
     b.dataset.cat = c.id;
