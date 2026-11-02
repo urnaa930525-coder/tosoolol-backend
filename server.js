@@ -567,6 +567,56 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// ---------- One-time recovery: rebuild the videos table from Bunny ----------
+// Use after the database was lost. Reads every finished video in the Bunny
+// library (the Bunny keys stay on the server, never in the browser) and adds
+// the ones missing from the DB. Titles come from Bunny; category defaults to
+// "movie" (override with ?category=series|movie|show|ai|adult).
+// Call:  POST /api/admin/restore-from-bunny?adminToken=YOUR_TOKEN
+app.post('/api/admin/restore-from-bunny', requireAdmin, async (req, res) => {
+  if (!BUNNY_LIBRARY_ID || !BUNNY_API_KEY || !BUNNY_CDN_HOSTNAME) {
+    return res.status(503).json({ error: 'BUNNY_* тохиргоо дутуу байна.' });
+  }
+  const allowed = ['series', 'movie', 'show', 'ai', 'adult'];
+  const category = allowed.includes(req.query.category) ? req.query.category : 'movie';
+  try {
+    let page = 1, added = 0, skipped = 0, notReady = 0, total = 0;
+    const titles = [];
+    for (;;) {
+      const r = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos?page=${page}&itemsPerPage=100&orderBy=date`, {
+        headers: { 'AccessKey': BUNNY_API_KEY, accept: 'application/json' }
+      });
+      if (!r.ok) throw new Error('Bunny жагсаалт авахад алдаа: ' + (await r.text()));
+      const data = await r.json();
+      const items = data.items || [];
+      total = data.totalItems || total;
+      for (const v of items) {
+        if (v.status !== 4 && v.status !== 3) { notReady++; continue; } // 3 = transcoded, 4 = finished
+        const exists = await pool.query('SELECT 1 FROM videos WHERE bunny_video_id = $1', [v.guid]);
+        if (exists.rowCount) { skipped++; continue; }
+        const b = bunnyUrls(v.guid);
+        const title = v.title || 'Нэргүй';
+        const id = Date.now() * 1000 + added; // unique, stays within BIGINT
+        const uploadedAt = v.dateUploaded ? new Date(v.dateUploaded) : new Date();
+        await pool.query(
+          `INSERT INTO videos (id, title, category, description, badge, filename, url, thumbnail_url, size, bunny_video_id, video_provider, uploaded_at)
+           VALUES ($1,$2,$3,'','',$4,$5,$6,$7,$8,'bunny',$9)`,
+          [id, title, category, title, b.playbackUrl, b.thumbnailUrl, Number(v.storageSize) || 0, v.guid, uploadedAt]
+        );
+        titles.push(title);
+        added++;
+      }
+      if (page * 100 >= total || !items.length) break;
+      page++;
+    }
+    res.json({ ok: true, totalInBunny: total, added, alreadyInDb: skipped, notReady, titles });
+  } catch (e) {
+    console.error('restore-from-bunny failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 app.get('/api/videos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
   res.json(rows.map(videoRowToJson));
