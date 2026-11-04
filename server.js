@@ -51,6 +51,24 @@ function bunnyUrls(guid){
   };
 }
 
+// Bunny names thumbnails like "thumbnail_da00b351.jpg" (not always
+// "thumbnail.jpg"), so ask Bunny for the real file name of a video.
+// Returns the full CDN URL, or null if the video isn't processed yet.
+async function lookupBunnyThumbnail(guid){
+  try {
+    const r = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${guid}`, {
+      headers: { 'AccessKey': BUNNY_API_KEY, accept: 'application/json' }
+    });
+    if (!r.ok) return null;
+    const v = await r.json();
+    if (!v.thumbnailFileName) return null;
+    return `https://${BUNNY_CDN_HOSTNAME}/${guid}/${v.thumbnailFileName}`;
+  } catch (e) {
+    console.error('Bunny thumbnail lookup failed:', e.message);
+    return null;
+  }
+}
+
 // TUS (resumable upload protocol) signature, so the BROWSER can upload the
 // video file straight to Bunny's servers — never passing through our own
 // backend at all. This is what makes multi-GB movies work reliably: no
@@ -619,6 +637,20 @@ app.post('/api/admin/restore-from-bunny', requireAdmin, async (req, res) => {
 
 app.get('/api/videos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
+  // Self-heal: Bunny videos still pointing at the guessed ".../thumbnail.jpg"
+  // (and with no custom thumbnail) get the real file name from Bunny.
+  if (BUNNY_LIBRARY_ID && BUNNY_API_KEY && BUNNY_CDN_HOSTNAME) {
+    await Promise.all(rows.map(async (r) => {
+      if (r.video_provider !== 'bunny' || !r.bunny_video_id || r.thumbnail_public_id) return;
+      if (!r.thumbnail_url || !/\/thumbnail\.jpg$/.test(r.thumbnail_url)) return;
+      const real = await lookupBunnyThumbnail(r.bunny_video_id);
+      if (real) {
+        r.thumbnail_url = real;
+        pool.query('UPDATE videos SET thumbnail_url = $1 WHERE id = $2', [real, r.id])
+          .catch(e => console.error('thumbnail repair failed:', e.message));
+      }
+    }));
+  }
   res.json(rows.map(videoRowToJson));
 });
 
