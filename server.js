@@ -639,6 +639,7 @@ app.post('/api/admin/restore-from-bunny', requireAdmin, async (req, res) => {
 });
 
 
+const bunnyChecked = new Map(); // bunny guid -> last time we re-checked its thumbnail name
 app.get('/api/videos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
   // Self-heal: Bunny videos still pointing at the guessed ".../thumbnail.jpg"
@@ -647,13 +648,15 @@ app.get('/api/videos', async (req, res) => {
   if (BUNNY_LIBRARY_ID && BUNNY_API_KEY && BUNNY_CDN_HOSTNAME) {
     await Promise.all(rows.map(async (r) => {
       if (r.video_provider !== 'bunny' || !r.bunny_video_id) return;
-      const badThumb = !r.thumbnail_public_id && r.thumbnail_url && /\/thumbnail\.jpg$/.test(r.thumbnail_url);
+      const stale = !r.thumbnail_public_id && (!bunnyChecked.has(r.bunny_video_id) || Date.now() - bunnyChecked.get(r.bunny_video_id) > 10 * 60 * 1000);
+      const badThumb = !r.thumbnail_public_id && (!r.thumbnail_url || /\/thumbnail\.jpg$/.test(r.thumbnail_url) || stale);
+      if (stale) bunnyChecked.set(r.bunny_video_id, Date.now());
       const noDuration = r.duration === null || r.duration === undefined;
       if (!badThumb && !noDuration) return;
       const info = await lookupBunnyVideo(r.bunny_video_id);
       if (!info) return;
       const sets = [], vals = [];
-      if (badThumb && info.thumbnailUrl) { r.thumbnail_url = info.thumbnailUrl; vals.push(info.thumbnailUrl); sets.push('thumbnail_url = $' + vals.length); }
+      if (badThumb && info.thumbnailUrl && info.thumbnailUrl !== r.thumbnail_url) { r.thumbnail_url = info.thumbnailUrl; vals.push(info.thumbnailUrl); sets.push('thumbnail_url = $' + vals.length); }
       if (noDuration && info.length) { r.duration = info.length; vals.push(info.length); sets.push('duration = $' + vals.length); }
       if (!sets.length) return;
       vals.push(r.id);
