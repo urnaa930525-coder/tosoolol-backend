@@ -519,6 +519,53 @@
     #rows { padding: 0 16px; }
     .poster { flex-basis: 240px; }
   }
+
+  /* ===== Royal blue загвар: төвд play товч, "Up next" мөр, үргэлжлэх хугацаатай картууд ===== */
+  :root {
+    --bg: #0a1470; --sidebar: #08105e; --bg-elev-2: #16239a;
+    --rose: #8aa2ff; --violet: #4f6bff; --gold: #4f6bff;
+    --cream: #f4f6ff; --cream-dim: #a9b6f0; --line: rgba(190,205,255,.16);
+    --c-ai: #6f86ff; --c-movie: #4f6bff; --c-series: #3b52e0; --c-show: #9db0ff;
+  }
+  body { background: linear-gradient(180deg, #1d33d0 0%, #0f1ca0 38%, #0a1470 70%, #070e50 100%) fixed !important; }
+  .sidebar { background: linear-gradient(180deg, rgba(8,16,94,.96), rgba(7,13,76,.92)) !important; }
+  .topbar { background: linear-gradient(180deg, rgba(10,20,120,.75) 0%, rgba(10,20,120,0) 100%) !important; }
+  .hero-scrim { background: linear-gradient(90deg, rgba(12,26,150,.95) 0%, rgba(14,28,160,.7) 34%, rgba(14,28,160,0) 70%), linear-gradient(0deg, #0a1470 0%, rgba(10,20,112,0) 52%), linear-gradient(180deg, rgba(10,20,120,.55) 0%, rgba(10,20,120,0) 24%) !important; }
+
+  .hero-tag { display: block; font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #dfe6ff; margin: 0 0 12px; }
+  .hero-tag:empty { display: none; }
+  .hero h2.display { font-family: 'Work Sans', sans-serif; text-transform: none; font-weight: 800; letter-spacing: -.02em; font-size: clamp(2.1rem, 5vw, 3.6rem); margin: 0 0 8px; }
+  .hero-meta { margin: 0 0 14px; gap: 0; }
+  .hero-year, .hero-chip { font-size: 1.02rem; font-weight: 500; color: #e9eeff; border: none; padding: 0; text-transform: none; letter-spacing: 0; background: none; }
+  .hero-chip + .hero-chip::before, .hero-year + .hero-chip::before { content: '·'; margin: 0 9px; opacity: .6; }
+  .hero-chip.hl { background: rgba(255,255,255,.18); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; margin-left: 10px; }
+  .hero-chip.hl::before { content: none !important; }
+  .hero p.sub { font-size: .88rem; color: #d3dbff; max-width: 460px; }
+  .btn-play { background: #4f6bff; color: #fff; border-radius: 999px; box-shadow: 0 10px 30px rgba(40,60,230,.5); }
+  .btn-play:hover { background: #6680ff; }
+  .btn-ghost { border-radius: 999px; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.22); }
+
+  .hero-bigplay { position: absolute; z-index: 3; right: 24%; top: 42%; transform: translateY(-50%); width: 84px; height: 84px; border-radius: 50%; border: none; background: #4a5cf5; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 44px rgba(30,45,210,.65), 0 0 0 10px rgba(255,255,255,.08); transition: transform .15s, background .15s; padding-left: 4px; }
+  .hero-bigplay:hover { transform: translateY(-50%) scale(1.07); background: #6074ff; }
+  @media (max-width: 880px) { .hero-bigplay { right: 50%; transform: translate(50%, -50%); top: 30%; width: 68px; height: 68px; } .hero-bigplay:hover { transform: translate(50%, -50%) scale(1.07); } }
+
+  .row-head h3 { font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; text-transform: none; color: #fff; }
+  .row-head span { opacity: .6; }
+  .poster { flex: 0 0 280px; border-radius: 8px; border: none; box-shadow: 0 10px 30px rgba(3,8,60,.5); }
+  .poster-scrim { background: linear-gradient(180deg, rgba(10,20,112,0) 45%, rgba(8,14,84,.9) 100%); }
+  .poster-play { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.95); color: #1d2fc4; display: flex; align-items: center; justify-content: center; padding-left: 2px; box-shadow: 0 4px 16px rgba(0,0,0,.35); transition: transform .15s; z-index: 2; }
+  .poster:hover .poster-play { transform: translate(-50%, -50%) scale(1.12); }
+  .poster-dur { position: absolute; right: 8px; top: 8px; z-index: 2; background: rgba(10,16,70,.78); color: #fff; font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 5px; }
+  .poster .poster-play svg { position: static; inset: auto; width: 14px; height: 14px; }
+  .poster-fav { top: auto; bottom: 8px; right: 8px; }
+  @media (max-width: 640px) {
+    .poster-play { width: 28px; height: 28px; top: 42%; }
+    .poster-play svg, .poster .poster-play svg { width: 11px; height: 11px; }
+    .poster-dur { font-size: .6rem; padding: 2px 5px; right: 5px; top: 5px; }
+    .hero-bigplay { top: 22%; }
+  }
+  .poster:hover { border: none; box-shadow: 0 16px 38px rgba(8,18,140,.7); }
+  @media (max-width: 880px) { .poster { flex-basis: 230px; } }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
@@ -642,6 +689,7 @@
       <section class="hero" id="hero">
         <div class="hero-canvas" id="heroCanvas"></div>
         <div class="hero-scrim"></div>
+        <button class="hero-bigplay" id="heroBigPlay" aria-label="Үзэх"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5l13 7.5-13 7.5z"/></svg></button>
         <div class="hero-content">
           <span class="hero-tag" id="heroTag">ШИНЭЭР НЭМЭГДЛЭЭ</span>
           <h2 class="display" id="heroTitle"></h2>
@@ -782,6 +830,7 @@
         thumbnailUrl: v.thumbnailUrl ? (API_BASE + v.thumbnailUrl) : null,
         subtitleUrl: v.subtitleUrl ? (API_BASE + v.subtitleUrl) : null,
         subtitleLang: v.subtitleLang || null,
+        length: v.duration || 0,
         year: v.uploadedAt ? new Date(v.uploadedAt).getFullYear() : null,
         isUploaded: true
       }));
@@ -896,6 +945,8 @@
     document.getElementById('heroTitle').textContent = v.title;
     document.getElementById('heroDesc').textContent = v.desc;
     document.getElementById('heroPlay').onclick = () => openPlayer(v.id);
+    document.getElementById('heroBigPlay').onclick = () => openPlayer(v.id);
+    document.getElementById('heroTag').textContent = v.sub || '';
     document.getElementById('heroInfo').onclick = () => openDetail(v.id);
     // meta chips: year · category · badge
     const meta = document.getElementById('heroMeta');
@@ -917,6 +968,13 @@
   // ---------- Search ----------
   const searchInput = document.getElementById('searchInput');
   searchInput.addEventListener('input', render);
+
+  function fmtLen(sec){
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), r = sec % 60;
+    const mm = (h ? String(m).padStart(2, '0') : String(m));
+    return (h ? h + ':' : '') + mm + ':' + String(r).padStart(2, '0');
+  }
 
   // ---------- Render rows ----------
   const rowsEl = document.getElementById('rows');
@@ -962,7 +1020,9 @@
         p.innerHTML = `
           ${v.thumbnailUrl ? `<img src="${v.thumbnailUrl}" alt="">` : artSVG(v)}
           <div class="poster-scrim"></div>
-          <span class="poster-badge" style="background:${badgeColor}">${v.badge}</span>
+          <span class="poster-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5l13 7.5-13 7.5z"/></svg></span>
+          ${v.length ? `<span class="poster-dur">${fmtLen(v.length)}</span>` : ''}
+          ${v.badge ? `<span class="poster-badge" style="background:${badgeColor}">${v.badge}</span>` : ''}
           <button class="poster-fav" data-fav="${isFav?1:0}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="${isFav?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C.5 8 2 4 6 4c2 0 3.5 1.2 4 2.2C10.5 5.2 12 4 14 4c4 0 5.5 4 3.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
           </button>
