@@ -749,6 +749,17 @@
       mask-image: linear-gradient(90deg, transparent 0%, #000 22%), linear-gradient(180deg, #000 68%, transparent 100%) !important; }
     .hero-content { max-width: 58% !important; }
   }
+  /* v9: эхний загвар шиг — зураг баруун талаар том, дэлгэцийн дээд ирмэгээс эхэлж, доош уусна */
+  @media (min-width: 881px) {
+    .hero { --hh: clamp(440px, 58vh, 560px) !important; height: var(--hh) !important; min-height: var(--hh) !important; align-items: center !important; }
+    .hero-canvas { top: 0 !important; right: 0 !important; width: 68% !important; height: 100% !important;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 38%), linear-gradient(180deg, #000 66%, transparent 100%) !important;
+      mask-image: linear-gradient(90deg, transparent 0%, #000 38%), linear-gradient(180deg, #000 66%, transparent 100%) !important; }
+    .hero-canvas::after { height: 64px !important; }
+    .hero-content { max-width: 46% !important; padding: 60px 0 60px 8vw !important; }
+    .hero h2.display { font-size: clamp(2.2rem, 3.8vw, 3.6rem) !important; }
+    #rows { margin-top: -80px !important; }
+  }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
