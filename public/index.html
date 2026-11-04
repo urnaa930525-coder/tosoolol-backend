@@ -6,7 +6,7 @@
 <title>NextKino — Кино, Цуврал, AI контент</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0A0E27;
@@ -642,14 +642,6 @@
     .hero-bigplay { right: calc(14px + (var(--hh) - 28px) * 0.75 - 33px) !important; top: 50% !important; transform: translateY(-50%) !important; }
     .hero-content { max-width: calc(100% - (var(--hh) - 28px) * 1.5 - 60px) !important; }
   }
-
-  /* ===== Кирилл үсгийг бүрэн дэмждэг Manrope фонт ===== */
-  body, button, input, textarea, select { font-family: 'Manrope', 'Work Sans', sans-serif !important; }
-  h1, h2, h3, .display, .detail-title, .detail-section h3, .adult-box h2,
-  .hero h2.display, .row-head h3, .tagline-title, .entry-tagline { font-family: 'Manrope', sans-serif !important; letter-spacing: -.01em; }
-  .hero h2.display { font-weight: 800 !important; letter-spacing: -.02em; }
-  .row-head h3 { letter-spacing: .12em; }
-  .brand-mark, .brand-mark span, .entry-brand, .entry-logo { font-family: 'Fraunces', serif !important; }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
@@ -1115,7 +1107,7 @@
         p.className = 'poster';
         const badgeColor = { ai:'var(--c-ai)', movie:'var(--c-movie)', series:'var(--c-series)', show:'var(--c-show)', adult:'var(--c-adult)' }[v.cat] || 'var(--gold)';
         p.innerHTML = `
-          ${v.thumbnailUrl ? `<img src="${v.thumbnailUrl}" alt="">` : artSVG(v)}
+          ${v.thumbnailUrl ? `<img src="${v.thumbnailUrl}" alt="" onerror="this.style.display='none'">` : artSVG(v)}
           <div class="poster-scrim"></div>
           <span class="poster-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5l13 7.5-13 7.5z"/></svg></span>
           ${v.length ? `<span class="poster-dur">${fmtLen(v.length)}</span>` : ''}
