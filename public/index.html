@@ -584,12 +584,60 @@
     .hero-content { max-width: 100%; padding: 0 20px 26px !important; }
     .hero-bigplay { right: 50% !important; top: 26% !important; transform: translate(50%, -50%) !important; width: 58px !important; height: 58px !important; }
   }
+
+  /* ===== Entry screen v2 (landing style) ===== */
+  .entry-overlay { background: #05071c; display:block; padding:0; overflow:hidden; }
+  .entry-overlay::before { content:""; position:absolute; inset:0; z-index:0;
+    background: radial-gradient(ellipse 70% 60% at 50% 45%, rgba(40,60,200,.35) 0%, rgba(5,7,28,0) 70%),
+                radial-gradient(ellipse 50% 40% at 85% 10%, rgba(120,60,220,.25) 0%, rgba(5,7,28,0) 70%); }
+  .entry-mock { position:absolute; inset:0; z-index:1; pointer-events:none; overflow:hidden; }
+  .entry-mock::after { content:""; position:absolute; inset:0;
+    background: radial-gradient(ellipse 55% 55% at 50% 50%, rgba(5,7,28,.85) 0%, rgba(5,7,28,.5) 50%, rgba(5,7,28,.15) 100%); }
+  .mk-laptop { position:absolute; left:50%; top:46%; width:min(980px,78vw); aspect-ratio:16/10;
+    transform: translate(-50%,-50%) perspective(1600px) rotateX(8deg) rotateY(-14deg) rotateZ(-4deg);
+    border:6px solid #1a1f4d; border-radius:16px; background:#0a0f33; padding:14px; box-shadow:0 40px 120px rgba(0,0,0,.7); opacity:.95; }
+  .mk-phone { position:absolute; right:calc(50% - 560px); top:52%; width:min(230px,22vw); aspect-ratio:9/18.5;
+    transform: translateY(-50%) perspective(1200px) rotateY(-18deg) rotateZ(6deg);
+    border:5px solid #1a1f4d; border-radius:30px; background:#0a0f33; padding:10px; box-shadow:0 30px 90px rgba(0,0,0,.7); opacity:.8; }
+  .mk-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; height:100%; }
+  .mk-phone .mk-grid { grid-template-columns:repeat(2,1fr); }
+  .mk-card { border-radius:8px; background: var(--g, linear-gradient(135deg,#2a3bd0,#7a3fe0)) center/cover; }
+  .mk-card:nth-child(3n+1){ --g: linear-gradient(135deg,#1c2fb8,#5b2bd6); }
+  .mk-card:nth-child(3n+2){ --g: linear-gradient(135deg,#a02a7a,#3a2fd0); }
+  .mk-card:nth-child(3n){ --g: linear-gradient(135deg,#0f6fb8,#2b3fd6); }
+  .mk-card.has-img { background-image: var(--img); background-size:cover; background-position:center; }
+  .entry-top { position:absolute; z-index:3; top:0; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:20px 40px; }
+  .entry-top .entry-logo { font-family:'Fraunces',serif; font-weight:700; font-size:1.4rem; color:#F2F0FA; }
+  .entry-top nav { display:flex; gap:28px; }
+  .entry-top nav a { color:#B8B5D8; font-size:.9rem; text-decoration:none; cursor:pointer; }
+  .entry-top nav a:hover { color:#fff; }
+  .entry-main { position:relative; z-index:2; min-height:100%; display:flex; align-items:center; justify-content:center; padding:90px 24px 70px; box-sizing:border-box; }
+  .entry-inner { max-width:560px; }
+  .entry-brand { font-size:4rem; display:flex; align-items:center; justify-content:center; gap:4px; text-shadow:0 4px 30px rgba(0,0,0,.6); }
+  .entry-tagline { font-size:1.9rem; margin:6px 0 12px;
+    background:linear-gradient(90deg,#7aa2ff,#c46bff,#ff6fae); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .entry-sub { color:#c9c7e6; font-size:1rem; margin-bottom:30px; }
+  .entry-btn { padding:15px 42px; font-size:1rem; box-shadow:0 8px 30px rgba(110,80,255,.45); cursor:pointer; }
+  .entry-btn-login { background:linear-gradient(90deg,#3d5afe,#9b4dff); }
+  .entry-btn-signup { background:linear-gradient(90deg,#c13cff,#ff4f9a); }
+  .entry-form { background:rgba(10,15,51,.75); border:1px solid rgba(255,255,255,.1); padding:22px; border-radius:18px; backdrop-filter:blur(10px); }
+  .entry-foot { position:absolute; z-index:3; bottom:16px; left:0; right:0; text-align:center; color:#7f7ca8; font-size:.78rem; }
+  @media (max-width:880px){
+    .mk-laptop { width:130vw; top:34%; transform:translate(-50%,-50%) perspective(1200px) rotateX(8deg) rotateZ(-6deg); }
+    .mk-phone { display:none; }
+    .entry-top { padding:16px 20px; } .entry-top nav { display:none; }
+    .entry-brand { font-size:2.8rem; } .entry-tagline { font-size:1.4rem; }
+    .entry-choice { flex-direction:column; align-items:center; } .entry-btn { width:100%; max-width:280px; }
+  }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 <body>
 
 <div class="entry-overlay" id="entryOverlay">
+  <div class="entry-mock" aria-hidden="true"><div class="mk-laptop"><div class="mk-grid"><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div></div></div><div class="mk-phone"><div class="mk-grid"><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div><div class="mk-card"></div></div></div></div>
+  <div class="entry-top"><span class="entry-logo">NextKino</span><nav><a>Кино</a><a>Цуврал</a><a>Тусламж</a></nav></div>
+  <div class="entry-main">
   <div class="entry-inner">
     <div class="entry-brand brand-mark"><span class="brand-next">Next</span><svg class="brand-cam" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--violet)"><circle cx="9" cy="6" r="1.6"/><circle cx="13" cy="6" r="1.6"/><rect x="2" y="9" width="14" height="10" rx="2"/><path d="M16 12.5l6-3v7l-6-3z"/></svg><span class="brand-kino">Kino</span></div>
     <p class="entry-tagline">Your Story Begins Here</p>
@@ -614,7 +662,17 @@
       <button type="button" class="entry-back" id="entryBackBtn">← Буцах</button>
     </form>
   </div>
+  </div>
+  <div class="entry-foot">© 2026 NextKino. Бүх эрх хуулиар хамгаалагдсан.</div>
 </div>
+<script>
+(function(){try{fetch((typeof API_BASE!=='undefined'?API_BASE:'')+'/api/videos').then(r=>r.json()).then(d=>{
+  const list=(d.videos||d||[]).filter(v=>v&&v.thumbnailUrl);if(!list.length)return;
+  const base=(typeof API_BASE!=='undefined'?API_BASE:'');
+  document.querySelectorAll('#entryOverlay .mk-card').forEach((c,i)=>{const v=list[i%list.length];
+    c.style.setProperty('--img','url("'+(/^https?:/.test(v.thumbnailUrl)?v.thumbnailUrl:base+v.thumbnailUrl)+'")');c.classList.add('has-img');});
+}).catch(()=>{});}catch(e){}})();
+</script>
 
 <div class="app">
   <div class="detail" id="detail">
