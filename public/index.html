@@ -6,7 +6,7 @@
 <title>NextKino — Кино, Цуврал, AI контент</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Fira+Sans+Extra+Condensed:ital,wght@1,700;1,800;1,900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Fira+Sans+Extra+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;1,700;1,800;1,900&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0A0E27;
@@ -712,6 +712,43 @@
     letter-spacing: .01em !important; line-height: 1.12 !important; }
   .hero h2.display { font-size: clamp(2.6rem, 4.8vw, 4.4rem) !important; }
   .detail-title { font-size: clamp(2.2rem, 5.5vw, 3.8rem) !important; }
+
+  /* ===== Бүх текстэнд нэг фонт: Fira Sans Extra Condensed ===== */
+  body, button, input, textarea, select, h1, h2, h3, h4, .display, .detail-title, .detail-section h3, .adult-box h2,
+  .row-head h3, .poster-title, .hero p.sub, .hero-meta, .btn-play, .btn-ghost, .tagline-sub, .entry-sub, .entry-tagline {
+    font-family: 'Fira Sans Extra Condensed', 'Arial Narrow', 'Inter', sans-serif !important; }
+  .brand-mark, .brand-mark span, .entry-brand, .entry-logo { font-family: 'Fraunces', serif !important; }
+  body { font-size: 1.06rem; }
+  .hero p.sub { font-size: 1rem !important; }
+  .poster-title { font-size: 1rem !important; font-weight: 700; }
+  .row-head h3 { font-size: .95rem !important; letter-spacing: .12em !important; }
+  .btn-play, .btn-ghost { font-size: .95rem !important; }
+  .hero-year, .hero-chip { font-size: 1.1rem !important; }
+
+  /* ===== Hero v7: 3:1 харьцаатай намхан зураг, дээд талдаа урагдсан хүрээтэй ===== */
+  @media (min-width: 881px) {
+    .hero { --hh: clamp(300px, calc((100vw - 76px) * .2267), 430px) !important; }
+    .hero h2.display { font-size: clamp(2.2rem, 3.6vw, 3.4rem) !important; }
+    .hero p.sub { -webkit-line-clamp: 2; margin-bottom: 18px !important; }
+    .hero-content { padding: 30px 0 30px 8vw !important; }
+    .hero-canvas::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 46px; z-index: 2; pointer-events: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 40' preserveAspectRatio='none'%3E%3Cpolygon fill='%230a1230' points='0%2C0 1000%2C0 1000%2C18 984%2C20 952%2C9 938%2C34 909%2C11 886%2C26 873%2C37 845%2C14 832%2C10 807%2C21 793%2C15 779%2C25 754%2C9 716%2C26 701%2C38 682%2C28 650%2C26 637%2C26 607%2C20 594%2C15 581%2C25 542%2C12 521%2C21 505%2C25 490%2C26 469%2C25 431%2C29 414%2C11 384%2C26 352%2C14 329%2C11 300%2C30 286%2C26 273%2C27 255%2C23 222%2C25 197%2C32 175%2C22 145%2C37 119%2C19 98%2C15 61%2C13 27%2C32 8%2C10 0%2C20'/%3E%3C/svg%3E") no-repeat center / 100% 100%; }
+    .hero-canvas { border-top: 0; }
+    #rows { margin-top: -30px !important; }
+  }
+  @media (min-width: 881px) {
+    .hero { height: calc(var(--hh) + 76px) !important; min-height: calc(var(--hh) + 76px) !important; align-items: flex-end !important; }
+    .hero-canvas { top: 76px !important; height: var(--hh) !important; width: 68% !important; }
+    .hero-content { padding: 0 0 30px 8vw !important; }
+    #rows { margin-top: -10px !important; }
+  }
+  /* v8: зураг зөвхөн баруун 1/3 хэсэгт */
+  @media (min-width: 881px) {
+    .hero-canvas { width: 34% !important; right: 2vw !important;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%), linear-gradient(180deg, #000 68%, transparent 100%) !important;
+      mask-image: linear-gradient(90deg, transparent 0%, #000 22%), linear-gradient(180deg, #000 68%, transparent 100%) !important; }
+    .hero-content { max-width: 58% !important; }
+  }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
