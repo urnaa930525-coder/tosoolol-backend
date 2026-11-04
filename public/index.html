@@ -465,6 +465,60 @@
   .d-sec.on { background: rgba(91,141,239,.4); }
   .d-play { border-radius: 6px; } .detail-actions button { border-radius: 6px; }
   .adult-ok { background: linear-gradient(135deg, var(--c-adult), #5b8def); }
+
+  /* ===== Streaming TV загвар: дүрсэн цэс, том hero, хөндлөн картууд ===== */
+  .tagline { display: none; }
+  .content { padding: 0 0 60px; margin-top: -76px; }
+  .topbar { background: linear-gradient(180deg, rgba(8,13,28,.88) 0%, rgba(8,13,28,0) 100%) !important; backdrop-filter: none !important; position: sticky; z-index: 40; }
+  .hero { border-radius: 0; margin-top: 0; min-height: min(68vh, 600px); align-items: flex-end; }
+  .hero-canvas img { object-position: center 25%; }
+  .hero-scrim { background: linear-gradient(90deg, #0a1020 0%, rgba(10,16,32,.82) 32%, rgba(10,16,32,0) 70%), linear-gradient(0deg, #0a1020 0%, rgba(10,16,32,.0) 55%), linear-gradient(180deg, rgba(10,16,32,.6) 0%, rgba(10,16,32,0) 25%) !important; }
+  .hero-content { padding: 0 5vw 64px; max-width: 700px; }
+  .hero-tag { display: none; }
+  .hero h2.display { font-size: clamp(2rem, 5.2vw, 3.8rem); font-weight: 700; line-height: 1.05; letter-spacing: .01em; text-transform: uppercase; margin: 0 0 14px; text-shadow: 0 4px 24px rgba(0,0,0,.5); }
+  .hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+  .hero-meta:empty { display: none; }
+  .hero-year { font-size: .82rem; font-weight: 700; color: #fff; margin-right: 4px; }
+  .hero-chip { border: 1px solid rgba(255,255,255,.5); color: #e6edff; font-size: .68rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; }
+  .hero-chip.hl { background: #f5b82e; border-color: #f5b82e; color: #1a1200; font-weight: 800; }
+  .hero p.sub { color: #cdd7f3; font-size: .95rem; line-height: 1.6; max-width: 520px; margin: 0 0 26px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .hero p.sub:empty { display: none; }
+  .hero-actions { gap: 12px; flex-wrap: wrap; }
+  .btn-play { padding: 14px 38px; font-size: .95rem; font-weight: 700; border-radius: 6px; background: rgba(255,255,255,.9); box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+  .btn-play:hover { background: #fff; }
+  .btn-ghost { display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: .9rem; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); }
+  .btn-ghost:hover { background: rgba(255,255,255,.2); }
+
+  #rows { padding: 0 5vw; }
+  .row { margin-top: 30px; }
+  .row-head h3 { font-family: 'Work Sans', sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #dfe7ff; }
+  .poster { flex: 0 0 300px; border-radius: 12px; border: 1px solid rgba(200,215,255,.12); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+  .poster-scrim { background: linear-gradient(180deg, transparent 38%, rgba(6,10,24,.92) 100%); }
+  .poster-title { font-weight: 700; letter-spacing: .01em; }
+  .poster:hover { transform: translateY(-5px) scale(1.025); border-color: rgba(143,178,255,.6); box-shadow: 0 16px 36px rgba(20,40,110,.55); }
+
+  /* Зүүн талын дүрсэн цэс (desktop) */
+  @media (min-width: 881px) {
+    .sidebar { width: 76px; padding: 22px 10px; overflow: visible; background: linear-gradient(180deg, rgba(8,13,28,.98), rgba(8,13,28,.9)); border-right: 1px solid var(--line); z-index: 50; }
+    .sidebar-brand { padding: 4px 0 24px; display: flex; justify-content: center; font-size: 0; }
+    .sidebar-brand .brand-next, .sidebar-brand .brand-kino { display: none; }
+    .sidebar-brand .brand-cam { width: 30px; height: 30px; }
+    .nav-item { position: relative; justify-content: center; gap: 0; padding: 12px 0; font-size: 0; }
+    .nav-item svg { width: 22px; height: 22px; }
+    .nav-item.active svg, .nav-item:hover svg { color: #fff; opacity: 1; }
+    .nav-item.active::before { content: ''; position: absolute; left: -10px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--rose); }
+    .nav-item:hover::after { content: attr(title); position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); background: #16213f; color: #eef3ff; border: 1px solid var(--line); font-size: .8rem; font-weight: 600; padding: 6px 11px; border-radius: 6px; white-space: nowrap; z-index: 80; box-shadow: 0 8px 20px rgba(0,0,0,.4); pointer-events: none; }
+    .nav-divider { margin: 12px 8px; }
+  }
+  @media (max-width: 880px) {
+    .content { margin-top: -70px; }
+    .hero { min-height: 62vh; }
+    .hero-content { padding: 0 20px 36px; }
+    .btn-play { padding: 13px 28px; }
+    .btn-ghost { padding: 12px 16px; font-size: .84rem; }
+    #rows { padding: 0 16px; }
+    .poster { flex-basis: 240px; }
+  }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
@@ -538,8 +592,8 @@
     <div class="nav-group" id="mainNav"></div>
     <div class="nav-divider"></div>
     <div class="nav-group">
-      <button class="nav-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>Бидний тухай</button>
-      <button class="nav-item" id="sideSubBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Эрх нээлгэх</button>
+      <button class="nav-item" title="Бидний тухай"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>Бидний тухай</button>
+      <button class="nav-item" id="sideSubBtn" title="Эрх нээлгэх"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Эрх нээлгэх</button>
     </div>
   </aside>
 
@@ -591,10 +645,12 @@
         <div class="hero-content">
           <span class="hero-tag" id="heroTag">ШИНЭЭР НЭМЭГДЛЭЭ</span>
           <h2 class="display" id="heroTitle"></h2>
+          <div class="hero-meta" id="heroMeta"></div>
           <p class="sub" id="heroDesc"></p>
           <div class="hero-actions">
             <button class="btn-play" id="heroPlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l15 8-15 8z"/></svg>Үзэх</button>
-            <button class="btn-ghost" id="heroInfo">Дэлгэрэнгүй</button>
+            <button class="btn-ghost" id="heroInfo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Дэлгэрэнгүй</button>
+            <button class="btn-ghost" id="heroList"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg><span id="heroListText">Миний жагсаалт</span></button>
           </div>
         </div>
       </section>
@@ -726,6 +782,7 @@
         thumbnailUrl: v.thumbnailUrl ? (API_BASE + v.thumbnailUrl) : null,
         subtitleUrl: v.subtitleUrl ? (API_BASE + v.subtitleUrl) : null,
         subtitleLang: v.subtitleLang || null,
+        year: v.uploadedAt ? new Date(v.uploadedAt).getFullYear() : null,
         isUploaded: true
       }));
     } catch (e) {
@@ -813,6 +870,7 @@
     const b = document.createElement('button');
     b.className = 'nav-item' + (c.id === 'all' ? ' active' : '');
     b.dataset.cat = c.id;
+    b.title = c.label;
     b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${c.icon}</svg>${c.label}`;
     const selectCat = () => { activeCat = c.id; [...mainNav.children].forEach(x => x.classList.toggle('active', x === b)); render(); if (window.innerWidth <= 880) sidebar.classList.remove('open'); };
     b.onclick = () => {
@@ -839,6 +897,20 @@
     document.getElementById('heroDesc').textContent = v.desc;
     document.getElementById('heroPlay').onclick = () => openPlayer(v.id);
     document.getElementById('heroInfo').onclick = () => openDetail(v.id);
+    // meta chips: year · category · badge
+    const meta = document.getElementById('heroMeta');
+    meta.innerHTML = '';
+    const addChip = (t, cls) => { if (!t) return; const c = document.createElement('span'); c.className = 'hero-chip' + (cls ? ' ' + cls : ''); c.textContent = t; meta.appendChild(c); };
+    if (v.year) { const y = document.createElement('span'); y.className = 'hero-year'; y.textContent = v.year; meta.appendChild(y); }
+    addChip(v.sub);
+    addChip(v.subtitleUrl ? 'Хадмал' : '');
+    addChip(v.badge && v.badge !== 'Хадмал' ? v.badge : '', 'hl');
+    // "My list" = favourites
+    const listBtn = document.getElementById('heroList');
+    const listTxt = document.getElementById('heroListText');
+    const syncList = () => { listTxt.textContent = getFavs().includes(v.id) ? 'Жагсаалтад ✓' : 'Миний жагсаалт'; };
+    syncList();
+    listBtn.onclick = () => { toggleFav(v.id); syncList(); render(); };
   }
   renderHero();
 
