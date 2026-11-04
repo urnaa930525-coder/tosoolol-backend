@@ -654,6 +654,46 @@
   .detail-desc, .detail-section p { line-height: 1.75; }
   .poster-title { line-height: 1.35; }
   .tagline-sub, .entry-sub { line-height: 1.75; }
+
+  /* ===== v6: Netflix/SpaceX маягийн бараан хөх өнгө, зураг баруун талд бүтэн өндөртэй ===== */
+  :root { --bg:#0b1230; --sidebar:#070b1d; --bg-elev:#10193a99; --bg-elev-2:#17224a; }
+  body { background: radial-gradient(1300px 650px at 72% -8%, #1b2c64 0%, #0b1230 58%, #070a1c 100%) fixed !important; }
+  .hero-scrim { background: linear-gradient(0deg, #0b1230 0%, rgba(11,18,48,0) 45%) !important; }
+  .sidebar { background: linear-gradient(180deg, #080d22, #060919) !important; border-right: 1px solid rgba(255,255,255,.05) !important; }
+  .topbar { background: linear-gradient(180deg, rgba(7,10,28,.85), rgba(7,10,28,0)) !important; position: relative; z-index: 5; }
+  .row-head h3 { font-size: .8rem !important; letter-spacing: .14em !important; text-transform: uppercase !important; font-weight: 800 !important; color: #e4e9fb !important; }
+  .poster { border-radius: 6px !important; box-shadow: 0 8px 24px rgba(0,0,0,.45) !important; border: none !important; }
+  .poster:hover { box-shadow: 0 14px 34px rgba(0,0,0,.65) !important; transform: translateY(-3px); }
+  .poster-scrim { background: linear-gradient(180deg, rgba(7,10,28,0) 40%, rgba(7,10,28,.92) 100%) !important; }
+  .poster-title { font-weight: 800; font-size: .86rem; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  .poster-play { opacity: 0; transition: opacity .15s, transform .15s; }
+  .poster:hover .poster-play { opacity: 1; }
+  .poster-dur { background: rgba(7,10,28,.75) !important; }
+  @media (min-width: 881px) {
+    .hero { --hh: clamp(400px, 58vh, 560px); margin: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
+      height: var(--hh) !important; min-height: var(--hh) !important; align-items: center !important; }
+    .hero-canvas { top: 0 !important; right: 0 !important; left: auto !important; bottom: auto !important; height: 100% !important; width: 68% !important;
+      aspect-ratio: auto !important; border-radius: 0 !important; box-shadow: none !important; overflow: hidden;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 42%), linear-gradient(180deg, #000 68%, transparent 100%) !important;
+      mask-image: linear-gradient(90deg, transparent 0%, #000 42%), linear-gradient(180deg, #000 68%, transparent 100%) !important;
+      -webkit-mask-composite: source-in !important; mask-composite: intersect !important; }
+    .hero-canvas img { object-position: center 25% !important; }
+    .hero-bigplay { display: none !important; }
+    .hero-content { padding: 40px 0 70px 8vw !important; max-width: 46% !important; }
+    .hero h2.display { text-transform: uppercase !important; font-size: clamp(2rem, 3.6vw, 3.2rem) !important; letter-spacing: .01em !important; }
+    .hero p.sub { color: #c3cbe6 !important; font-size: .82rem !important; }
+    .btn-play { border-radius: 4px !important; background: #cfd4e0 !important; color: #0b1230 !important; box-shadow: 0 8px 26px rgba(0,0,0,.4) !important; text-transform: uppercase; letter-spacing: .06em; padding: 15px 40px !important; }
+    .btn-play:hover { background: #fff !important; }
+    .btn-ghost { background: none !important; border: none !important; border-radius: 4px !important; text-transform: uppercase; letter-spacing: .06em; font-size: .8rem !important; }
+    .btn-ghost:hover { background: rgba(255,255,255,.1) !important; }
+    .content { position: relative; }
+    .topbar { position: absolute !important; top: 0; left: 0; right: 0; width: calc(100% - 76px) !important; padding: 22px 36px 14px 36px !important; margin-left: 76px; box-sizing: border-box; width: auto; background: linear-gradient(180deg, rgba(7,10,28,.8), rgba(7,10,28,0)) !important; }
+    #rows { margin-top: -90px !important; position: relative; z-index: 2; }
+  }
+  @media (max-width: 880px) {
+    .hero-scrim { background: linear-gradient(0deg, #0b1230 0%, rgba(11,18,48,.4) 45%, rgba(11,18,48,0) 100%) !important; }
+    .hero-canvas { -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 40%, transparent 85%) !important; mask-image: linear-gradient(180deg, #000 0%, #000 40%, transparent 85%) !important; }
+  }
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
