@@ -52,19 +52,21 @@ function bunnyUrls(guid){
 }
 
 // Bunny names thumbnails like "thumbnail_da00b351.jpg" (not always
-// "thumbnail.jpg"), so ask Bunny for the real file name of a video.
-// Returns the full CDN URL, or null if the video isn't processed yet.
-async function lookupBunnyThumbnail(guid){
+// "thumbnail.jpg"), so ask Bunny for the real file name and the video length.
+// Returns { thumbnailUrl, length } (either may be null), or null on failure.
+async function lookupBunnyVideo(guid){
   try {
     const r = await fetch(`https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${guid}`, {
       headers: { 'AccessKey': BUNNY_API_KEY, accept: 'application/json' }
     });
     if (!r.ok) return null;
     const v = await r.json();
-    if (!v.thumbnailFileName) return null;
-    return `https://${BUNNY_CDN_HOSTNAME}/${guid}/${v.thumbnailFileName}`;
+    return {
+      thumbnailUrl: v.thumbnailFileName ? `https://${BUNNY_CDN_HOSTNAME}/${guid}/${v.thumbnailFileName}` : null,
+      length: Number(v.length) > 0 ? Math.round(Number(v.length)) : null
+    };
   } catch (e) {
-    console.error('Bunny thumbnail lookup failed:', e.message);
+    console.error('Bunny lookup failed:', e.message);
     return null;
   }
 }
@@ -191,6 +193,7 @@ async function initDb() {
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle_public_id TEXT;
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS bunny_video_id TEXT;
     ALTER TABLE videos ADD COLUMN IF NOT EXISTS video_provider TEXT DEFAULT 'cloudinary';
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration INTEGER;
   `);
   console.log('DB ready.');
 }
@@ -208,7 +211,8 @@ function videoRowToJson(r) {
     subtitleUrl: r.subtitle_url,
     subtitleLang: r.subtitle_lang,
     size: r.size !== null ? Number(r.size) : null,
-    uploadedAt: r.uploaded_at
+    uploadedAt: r.uploaded_at,
+    duration: r.duration !== null && r.duration !== undefined ? Number(r.duration) : null
   };
 }
 
@@ -638,17 +642,23 @@ app.post('/api/admin/restore-from-bunny', requireAdmin, async (req, res) => {
 app.get('/api/videos', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM videos ORDER BY uploaded_at ASC');
   // Self-heal: Bunny videos still pointing at the guessed ".../thumbnail.jpg"
-  // (and with no custom thumbnail) get the real file name from Bunny.
+  // (and with no custom thumbnail) get the real file name from Bunny, and
+  // videos without a stored duration get it too.
   if (BUNNY_LIBRARY_ID && BUNNY_API_KEY && BUNNY_CDN_HOSTNAME) {
     await Promise.all(rows.map(async (r) => {
-      if (r.video_provider !== 'bunny' || !r.bunny_video_id || r.thumbnail_public_id) return;
-      if (!r.thumbnail_url || !/\/thumbnail\.jpg$/.test(r.thumbnail_url)) return;
-      const real = await lookupBunnyThumbnail(r.bunny_video_id);
-      if (real) {
-        r.thumbnail_url = real;
-        pool.query('UPDATE videos SET thumbnail_url = $1 WHERE id = $2', [real, r.id])
-          .catch(e => console.error('thumbnail repair failed:', e.message));
-      }
+      if (r.video_provider !== 'bunny' || !r.bunny_video_id) return;
+      const badThumb = !r.thumbnail_public_id && r.thumbnail_url && /\/thumbnail\.jpg$/.test(r.thumbnail_url);
+      const noDuration = r.duration === null || r.duration === undefined;
+      if (!badThumb && !noDuration) return;
+      const info = await lookupBunnyVideo(r.bunny_video_id);
+      if (!info) return;
+      const sets = [], vals = [];
+      if (badThumb && info.thumbnailUrl) { r.thumbnail_url = info.thumbnailUrl; vals.push(info.thumbnailUrl); sets.push('thumbnail_url = $' + vals.length); }
+      if (noDuration && info.length) { r.duration = info.length; vals.push(info.length); sets.push('duration = $' + vals.length); }
+      if (!sets.length) return;
+      vals.push(r.id);
+      pool.query('UPDATE videos SET ' + sets.join(', ') + ' WHERE id = $' + vals.length, vals)
+        .catch(e => console.error('video repair failed:', e.message));
     }));
   }
   res.json(rows.map(videoRowToJson));
