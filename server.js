@@ -830,6 +830,21 @@ app.post('/api/upload', requireAdmin, upload.fields([{ name: 'video', maxCount: 
   }
 });
 
+// Change a video's category (admin only).
+app.patch('/api/videos/:id/category', requireAdmin, express.json(), async (req, res) => {
+  const allowed = ['series', 'movie', 'show', 'ai', 'adult'];
+  const category = req.body && req.body.category;
+  if (!allowed.includes(category)) return res.status(400).json({ error: 'Ангилал буруу байна.' });
+  try {
+    const { rows } = await pool.query('UPDATE videos SET category = $1 WHERE id = $2 RETURNING *', [category, req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Видео олдсонгүй.' });
+    res.json(videoRowToJson(rows[0]));
+  } catch (e) {
+    console.error('Category update failed:', e.message);
+    res.status(500).json({ error: 'Ангилал солиход алдаа гарлаа: ' + e.message });
+  }
+});
+
 app.post('/api/videos/:id/thumbnail', requireAdmin, upload.single('thumbnail'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'Thumbnail зураг олдсонгүй.' });
