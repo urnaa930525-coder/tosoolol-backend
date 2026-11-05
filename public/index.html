@@ -1200,6 +1200,7 @@
     { key:'uploaded', label:'Таны байршуулсан видео', filter: v => v.isUploaded },
     { key:'new', label:'Шинээр нэмэгдсэн', filter: v => true },
     { key:'ai', label:'AI-гаар бүтээсэн', filter: v => v.cat === 'ai' },
+    { key:'adult', label:'Насанд хүрэгчдэд 18+', filter: v => v.cat === 'adult' },
     { key:'movie', label:'Кино', filter: v => v.cat === 'movie' },
     { key:'series', label:'Цуврал', filter: v => v.cat === 'series' },
     { key:'show', label:'Нэвтрүүлэг', filter: v => v.cat === 'show' }
@@ -1217,7 +1218,7 @@
 
     let shown = 0;
     defs.forEach(def => {
-      let vids = allVideos().filter(def.filter);
+      let vids = allVideos().filter(def.filter).filter(v => v.cat !== 'adult' || def.key === 'adult' || activeCat === 'adult');
       if (q) vids = vids.filter(v => v.title.toLowerCase().includes(q) || v.desc.toLowerCase().includes(q));
       if (!vids.length) return;
       shown += vids.length;
