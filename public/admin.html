@@ -131,6 +131,9 @@ async function loadVideos() {
             <span>${v.title} — ${v.category} (${(v.size/1024/1024).toFixed(1)} MB)${v.subtitleUrl ? ' · 📝 ' + (v.subtitleLang||'').toUpperCase() : ''}</span>
           </span>
           <span>
+            <select onchange="changeCategory(${v.id}, this.value)" style="padding:6px;border-radius:8px;">
+              ${[['ai','AI кино'],['movie','Кино'],['series','Цуврал'],['show','Нэвтрүүлэг'],['adult','🔞 18+']].map(([k,l]) => `<option value="${k}"${v.category===k?' selected':''}>${l}</option>`).join('')}
+            </select>
             <button onclick="togglePreview(${v.id})" style="background:#4B3F92;">Урьдчилан үзэх</button>
             <button onclick="pickThumbnail(${v.id})" style="background:#2E7D6B;">Thumbnail солих</button>
             <button onclick="delVideo(${v.id})">Устгах</button>
@@ -205,6 +208,25 @@ function pickThumbnail(id) {
   input.click();
 }
 window.pickThumbnail = pickThumbnail;
+
+async function changeCategory(id, category) {
+  result.textContent = 'Ангилал солиж байна...';
+  try {
+    const res = await adminFetch(`/api/videos/${id}/category`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Алдаа');
+    result.textContent = 'Ангилал солигдлоо.';
+    loadVideos();
+  } catch (err) {
+    result.textContent = 'Алдаа: ' + err.message;
+    loadVideos();
+  }
+}
+window.changeCategory = changeCategory;
 
 async function delVideo(id) {
   await adminFetch('/api/videos/' + id, { method: 'DELETE' });
