@@ -1217,7 +1217,7 @@
 
     let shown = 0;
     defs.forEach(def => {
-      let vids = allVideos().filter(def.filter).filter(v => v.cat !== 'adult' || activeCat === 'adult');
+      let vids = allVideos().filter(def.filter);
       if (q) vids = vids.filter(v => v.title.toLowerCase().includes(q) || v.desc.toLowerCase().includes(q));
       if (!vids.length) return;
       shown += vids.length;
